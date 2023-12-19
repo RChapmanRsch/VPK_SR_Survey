@@ -1,0 +1,695 @@
+---
+title: "VPKSR_Survey_PhilHerman"
+author: "RobertChapman"
+date: "2023-12-12"
+output:
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(data.table)
+library(DT)
+
+data=list("SRCombined"=read.csv("SR_12-11.csv"),"VPKCombined"=read.csv("VPK_12-11.csv"))
+
+
+PlotTabulate=function(var, data, subpath=""){
+  sapply(names(data), simplify=FALSE, USE.NAMES = TRUE, function(d){
+    # print(paste0(subpath,d,"_",var,".png"))
+    # print(var %in% names(data[[d]]))
+     if(var %in% names(data[[d]])){
+      t=table(data[[d]][,var], useNA="always")
+      tp=prop.table(t)
+      write.csv(rbind("Freq"=t,"Prop"=tp),paste0(subpath,d,"_",var,"_table.csv"))
+      png(paste0(subpath,d,"_",var,".png"))
+      names(t)[is.na(names(t))]="Missing/NA"
+      for(name in which(nchar(names(t))>20)){
+        loc=unlist(gregexpr("\\s",names(t)[name]))[unlist(gregexpr("\\s",names(t)[name]))>12][1]
+        substr(names(t)[name], loc, loc) <- "\n"}
+      
+      #par(mar = c(bottom, left, top, right))
+        par(mar = c(12.1, 4.1, 4.1, 2.1))
+        par(las=2)
+        b=barplot(t, ylim=c(0,max(t)*1.2))
+        text(b, t + max(t)*0.1, t)
+      dev.off()
+
+      out=list("plot"=b,"freqtable"=t,"proptable"=tp)
+       }
+     else{out=list(NA)}
+  })
+}
+
+
+
+```
+
+
+### Analyis plan from Phil 12/4
+#### SR
+
+  *Analysis 1: Price of Care a prohibitive factor* <- CTree <p>
+      Outcome variable: Childcare too expensive, coded as dichotomous (either too expensive or not) <br>
+      Predictors:  Marital status, (combining married & living with partners), income, # of children needing care, preferred amount of money, transportation, ages of children needing care (collapsing across all ages - one value per row), parent education
+  <p>
+  *Analysis 2: Cross tabs/descriptives* <br>
+      1) Preferred distance by mode of transportation and people who did/didnt endorse pref for ‘conveniently located’<br>
+```{r SRA2Xtab1}
+    DistancebyTransModeforNotConvLocatedTrue=table(
+        data$SRCombined$PrimaryTransportationMode[
+          grep("*conveniently located*",data$SRCombined$TroubleFindingChildcare, invert=FALSE)], 
+        data$SRCombined$PreferredTravelDistance[
+          grep("*conveniently located*",data$SRCombined$TroubleFindingChildcare, invert=FALSE)])
+      write.csv(DistancebyTransModeforNotConvLocatedTrue, "SR_xtabs_PrefDistbyTranspMode_NotConvLocTRUE.csv")  
+
+    #Distance by Transportation Mode table for Not Conveniently Located = True
+      datatable(matrix(DistancebyTransModeforNotConvLocatedTrue, ncol = ncol(DistancebyTransModeforNotConvLocatedTrue), dimnames = dimnames(DistancebyTransModeforNotConvLocatedTrue)), caption="Distance by Transportation Mode table for Not Conveniently Located = True")
+      
+      DistancebyTransModeforNotConvLocatedFalse=table(
+        data$SRCombined$PrimaryTransportationMode[
+          !grepl("*conveniently located*",data$SRCombined$TroubleFindingChildcare)], 
+        data$SRCombined$PreferredTravelDistance[
+          !grepl("*conveniently located*",data$SRCombined$TroubleFindingChildcare)])
+      
+         write.csv(DistancebyTransModeforNotConvLocatedFalse, "SR_xtabs_PrefDistbyTranspMode_NotConvLocFALSE.csv")
+         
+      #Distance by Transportation Mode table for Not Conveniently Located = False   
+      datatable(matrix(DistancebyTransModeforNotConvLocatedFalse, ncol = ncol(DistancebyTransModeforNotConvLocatedFalse), dimnames = dimnames(DistancebyTransModeforNotConvLocatedFalse)), caption="Distance by Transportation Mode table for Not Conveniently Located = False")
+        
+```
+        
+    2) Provider quality with parent education<br>
+```{r SRA2Xtab2}
+
+NotQualitybyEducation=table(data$SRCombined$Education, "Provider Not High Quality"=grepl("*quality*",data$SRCombined$TroubleFindingChildcare))
+
+write.csv(NotQualitybyEducation,"SR_xtabs_EducationbyProviderNotQuality.csv")
+
+#Education by Provider Not High Quality   
+      datatable(matrix(NotQualitybyEducation, ncol = ncol(NotQualitybyEducation), dimnames = dimnames(NotQualitybyEducation)), caption="Education by Provider Not High Quality")
+
+
+```
+    3) "Provider not open during hours I need" vs Ranges for open/closed preferences<br>
+```{r SRA2Xtab3}
+
+
+TotalNotOpenHoursNeededbyBusinessHours=table("Provider Not Open Hours I need"=grepl("*hours*",data$SRCombined$TroubleFindingChildcare),
+"Preferred Hours Outside 7a-6p"=(data$SRCombined$ProviderOpensAM<"7:00"|data$SRCombined$ProviderClosesPM>"6:00"))
+
+TotalNotOpenHoursNeededbyBusinessHours
+
+ProviderHoursbyNotOpenHoursNeededTrue=table("Opens AM"=data$SRCombined$ProviderOpensAM[grep("*hours*",data$SRCombined$TroubleFindingChildcare)],
+      "Closes PM"=data$SRCombined$ProviderClosesPM[grep("*hours*",data$SRCombined$TroubleFindingChildcare)])
+
+write.csv(ProviderHoursbyNotOpenHoursNeededTrue,"SRxtabs_PrefHoursbyProvNotOpenHours.csv")
+
+#Provider Hours by Not Open Hours Needed = True   
+      datatable(matrix(ProviderHoursbyNotOpenHoursNeededTrue, ncol = ncol(ProviderHoursbyNotOpenHoursNeededTrue), dimnames = dimnames(ProviderHoursbyNotOpenHoursNeededTrue)), caption="Provider Hours by Not Open Hours Needed = True ", options = list(pageLength = 25))
+
+ProviderHoursbyNotOpenHoursNeededFalse=table("Opens AM"=data$SRCombined$ProviderOpensAM[grep("*hours*",data$SRCombined$TroubleFindingChildcare, invert=TRUE)],
+      "Closes PM"=data$SRCombined$ProviderClosesPM[grep("*hours*",data$SRCombined$TroubleFindingChildcare, invert=TRUE)])
+
+write.csv(ProviderHoursbyNotOpenHoursNeededFalse,"SRxtabs_PrefHoursbyProvOpenHours.csv")
+
+#Provider Hours by Not Open Hours Needed = False   
+      datatable(matrix(ProviderHoursbyNotOpenHoursNeededFalse, ncol = ncol(ProviderHoursbyNotOpenHoursNeededFalse), dimnames = dimnames(ProviderHoursbyNotOpenHoursNeededFalse)), caption="Provider Hours by Not Open Hours Needed = False ", options = list(pageLength = 25))
+
+
+```
+    4) Ranges for open/closed preferences <- general for everyone <br>
+```{r SRA2Xtab4}
+
+GenProviderHours=table("Opens AM"=data$SRCombined$ProviderOpensAM,
+      "Closes PM"=data$SRCombined$ProviderClosesPM)
+
+write.csv(GenProviderHours,"SRxtabs_PrefHours.csv")
+
+#General Provider Hours   
+      datatable(matrix(GenProviderHours, ncol = ncol(GenProviderHours), dimnames = dimnames(GenProviderHours)), caption="General Provider Hours", options = list(pageLength = 25))
+
+```
+
+#### VPK:
+    <p>
+    *No longer needed care*<br>
+    **Section 1: Sent kids to stay with family/friends**<p>
+        Household Size distribution<br>
+        Income distribution<br>
+        marital status frequencies<br>
+        what responses do they select for reasons having trouble finding a provider<p>
+```{r VPKA1, results='hide'}
+
+Sect1Indx=grep("*I decided to have my child stay with family/friends*",data$VPKCombined$WhyNoLongerNeeded)
+
+    VPKA1_HH_Size=PlotTabulate("HouseHoldSize", list("VPK_Child Staying with FamilyFriends"=data$VPKCombined[Sect1Indx,]))
+    barplot(VPKA1_HH_Size[[1]]$freqtable,main="VPK_Child Staying with FamilyFriends \n by House Hold Size")
+    VPKA1_HH_Inc=PlotTabulate("HouseHoldIncome", list("VPK_Child Staying with FamilyFriends"=data$VPKCombined[Sect1Indx,]))
+    par(mar = c(12.1, 4.1, 4.1, 2.1))
+    par(las=2)
+    barplot(VPKA1_HH_Inc[[1]]$freqtable, main="VPK_Child Staying with FamilyFriends \n by House Hold Income")
+    VPKA1_Marital=PlotTabulate("MaritalStatus", list("VPK_Child Staying with FamilyFriends"=data$VPKCombined[Sect1Indx,]))
+    par(mar = c(12.1, 4.1, 4.1, 2.1))
+    par(las=2)
+    barplot(VPKA1_Marital[[1]]$freqtable, main="VPK_Child Staying with FamilyFriends \n by Marital Status")
+    
+    png("FamFriends_Trouble.png")
+    par(mar = c(10.1, 4.1, 4.1, 2.1))
+    par(las=2)
+    barplot(apply(data$VPKCombined[Sect1Indx,grep("^Trbl",names(data$VPKCombined))], 2, function(c){sum(as.numeric(c),na.rm=TRUE)})) 
+    dev.off()
+
+    par(mar = c(10.1, 4.1, 4.1, 2.1))
+    par(las=2)
+    barplot(apply(data$VPKCombined[Sect1Indx,grep("^Trbl",names(data$VPKCombined))], 2, function(c){sum(as.numeric(c),na.rm=TRUE)}), main="VPK_Child Staying with FamilyFriends\nTrouble Finding a Provider") 
+    
+    
+```
+    
+  **Section 2: Stay at home with child**<p>
+      Household Size distribution<br>
+      Income distribution<br>
+      marital status frequencies<br>
+      what responses do they select for reasons having trouble finding a provider<br>
+```{r VPKA2, results='hide'}
+
+Sect2Indx=grep("*I decided to stay home with my child*",data$VPKCombined$WhyNoLongerNeeded)
+
+    VPKA2_HH_Size=PlotTabulate("HouseHoldSize", list("VPK_Child Staying Home"=data$VPKCombined[Sect2Indx,]))
+    barplot(VPKA2_HH_Size[[1]]$freqtable,main="VPK_Child Staying Home \n by House Hold Size")
+    VPKA2_HH_Inc=PlotTabulate("HouseHoldIncome", list("VPK_Child Staying Home"=data$VPKCombined[Sect2Indx,]))
+    par(mar = c(12.1, 4.1, 4.1, 2.1))
+    par(las=2)
+    barplot(VPKA2_HH_Inc[[1]]$freqtable, main="VPK_Child Staying Home \n by House Hold Income")
+    VPKA2_Marital=PlotTabulate("MaritalStatus", list("VPK_Child Staying Home"=data$VPKCombined[Sect2Indx,]))
+    par(mar = c(12.1, 4.1, 4.1, 2.1))
+    par(las=2)
+    barplot(VPKA2_Marital[[1]]$freqtable, main="VPK_Child Staying Home \n by Marital Status")
+    
+    png("FamFriends_Trouble.png")
+    par(mar = c(10.1, 4.1, 4.1, 2.1))
+    par(las=2)
+    barplot(apply(data$VPKCombined[Sect2Indx,grep("^Trbl",names(data$VPKCombined))], 2, function(c){sum(as.numeric(c),na.rm=TRUE)})) 
+    dev.off()
+
+    par(mar = c(10.1, 4.1, 4.1, 2.1))
+    par(las=2)
+    barplot(apply(data$VPKCombined[Sect2Indx,grep("^Trbl",names(data$VPKCombined))], 2, function(c){sum(as.numeric(c),na.rm=TRUE)}), main="VPK_Child Staying Home\nTrouble Finding a Provider") 
+    
+    
+```    
+
+  **Section 3: Alternative care**<p>
+      Household Size distribution<br>
+      Income distribution<br>
+      marital status frequencies<br>
+      what responses do they select for reasons having trouble finding a provider<br>
+
+```{r VPKA3, results='hide'}
+
+Sect3Indx=grep("*alternative*",data$VPKCombined$WhyNoLongerNeeded)
+
+    VPKA3_HH_Size=PlotTabulate("HouseHoldSize", list("VPK_AlternativeCare"=data$VPKCombined[Sect3Indx,]))
+    barplot(VPKA3_HH_Size[[1]]$freqtable,main="VPK_AlternativeCare \n by House Hold Size")
+    VPKA3_HH_Inc=PlotTabulate("HouseHoldIncome", list("VPK_AlternativeCare"=data$VPKCombined[Sect3Indx,]))
+    par(mar = c(12.1, 4.1, 4.1, 2.1))
+    par(las=2)
+    barplot(VPKA3_HH_Inc[[1]]$freqtable, main="VPK_AlternativeCare \n by House Hold Income")
+    VPKA3_Marital=PlotTabulate("MaritalStatus", list("VPK_AlternativeCare"=data$VPKCombined[Sect3Indx,]))
+    par(mar = c(12.1, 4.1, 4.1, 2.1))
+    par(las=2)
+    barplot(VPKA3_Marital[[1]]$freqtable, main="VPK_AlternativeCare \n by Marital Status")
+    
+    png("FamFriends_Trouble.png")
+    par(mar = c(10.1, 4.1, 4.1, 2.1))
+    par(las=2)
+    barplot(apply(data$VPKCombined[Sect3Indx,grep("^Trbl",names(data$VPKCombined))], 2, function(c){sum(as.numeric(c),na.rm=TRUE)})) 
+    dev.off()
+
+    par(mar = c(10.1, 4.1, 4.1, 2.1))
+    par(las=2)
+    barplot(apply(data$VPKCombined[Sect3Indx,grep("^Trbl",names(data$VPKCombined))], 2, function(c){sum(as.numeric(c),na.rm=TRUE)}), main="VPK_AlternativeCare\nTrouble Finding a Provider") 
+    
+    
+``` 
+
+### Discussion with Herman and Phil, 12/5
+#### Additional analyses
+
+      Adjusted income:
+      Income/# of folks in household-> (range)
+      
+```{r AdjustedIncome}
+
+data$SRCombined$AdjHouseHoldIncome=apply(data$SRCombined, 1, function(row){
+
+  if(!any(is.na(row[c("HouseHoldIncome","HouseHoldSize")]))){
+    
+    inc=switch(row["HouseHoldIncome"],
+      "Less than $14,000"=14000,
+      "$100,000 or more"=100000,
+      "$15,000 to 19,000"=15000,
+      "$20,000 to 29,000"=20000,
+      "$30,000 to $39,000"=30000,
+      "$40,000 to $49,000"=40000,
+      "$50,000 to $74,000"=50000,
+      "$75,000 to $100,000"=75000,
+      "Prefer not to answer"=NA)
+
+    size=switch(row["HouseHoldSize"],
+      "1"=1,
+      "2"=2,
+      "3"=3,
+      "4"=4,
+      "5"=5,
+      "6+"=6)
+  
+    out=as.numeric(inc/size)
+  }else{out=NA}
+  out
+})
+
+hist(data$SRCombined$AdjHouseHoldIncome)
+summary(data$SRCombined$AdjHouseHoldIncome)
+
+data$VPKCombined$AdjHouseHoldIncome=apply(data$VPKCombined, 1, function(row){
+
+  if(!any(is.na(row[c("HouseHoldIncome","HouseHoldSize")]))){
+    
+    inc=switch(row["HouseHoldIncome"],
+      "Less than $14,000"=14000,
+      "$100,000 or more"=100000,
+      "$15,000 to 19,000"=15000,
+      "$20,000 to 29,000"=20000,
+      "$30,000 to $39,000"=30000,
+      "$40,000 to $49,000"=40000,
+      "$50,000 to $74,000"=50000,
+      "$75,000 to $100,000"=75000,
+      "Prefer not to answer"=NA)
+
+    size=switch(row["HouseHoldSize"],
+      "1"=1,
+      "2"=2,
+      "3"=3,
+      "4"=4,
+      "5"=5,
+      "6+"=6)
+  
+    out=as.numeric(inc/size)
+  }else{out=NA}
+  out
+})
+
+hist(data$VPKCombined$AdjHouseHoldIncome)
+summary(data$VPKCombined$AdjHouseHoldIncome)
+
+```
+  
+      
+      Calc -> adjusted to money willing to spend per child (adj range)
+      Price per kid
+
+```{r AdjustedWillingToSpend}
+
+data$SRCombined$AdjWillingToSpend=apply(data$SRCombined, 1, function(row){
+
+  if(!any(is.na(row[c("WillingToSpend","HouseHoldSize")]))){
+
+    spend=switch(unlist(row["WillingToSpend"]),
+      "$0-25"=0,
+      "$25-50"=25,
+      "$50-75"=50,
+      "$75-100"=75,
+      "$100-150"=100,
+      "Greater than $150"=150)
+
+    size=switch(unlist(row["HouseHoldSize"]),
+      "1"=1,
+      "2"=2,
+      "3"=3,
+      "4"=4,
+      "5"=5,
+      "6+"=6)
+  
+    out=as.numeric(spend/size)
+  }else{out=NA}
+  out
+})
+
+hist(data$SRCombined$AdjWillingToSpend)
+summary(data$SRCombined$AdjWillingToSpend)
+
+
+data$VPKCombined$AdjWillingToSpend=apply(data$VPKCombined, 1, function(row){
+
+  if(!any(is.na(row[c("WillingToSpend","HouseHoldSize")]))){
+
+    spend=switch(unlist(row["WillingToSpend"]),
+      "$0-25"=0,
+      "$25-50"=25,
+      "$50-75"=50,
+      "$75-100"=75,
+      "$100-150"=100,
+      "Greater than $150"=150)
+
+    size=switch(unlist(row["HouseHoldSize"]),
+      "1"=1,
+      "2"=2,
+      "3"=3,
+      "4"=4,
+      "5"=5,
+      "6+"=6)
+  
+    out=as.numeric(spend/size)
+  }else{out=NA}
+  out
+})
+
+hist(data$VPKCombined$AdjWillingToSpend)
+summary(data$VPKCombined$AdjWillingToSpend)
+
+
+```      
+      
+      
+      
+      
+      Dig deeper on categories for specific reasons for trouble finding providers (try to identify characteristics)
+      
+      Trees -> VPK Outcome (Other, Didn’t Experience Challenges, Expensive, public)
+      
+```{r ctree, class.source = 'fold-show'}
+
+      # Trees -> VPK 
+      #   Outcome (Other, Didn’t Experience Challenges, Expensive, Public)
+            table(data$VPKCombined$Trbl_NoChlgns)
+            table(data$VPKCombined$Trbl_Expnsv)
+            table(data$VPKCombined$Trbl_NoPubSchls)
+            table(data$VPKCombined$Trbl_Other)
+
+      #   Predictors:  
+            #Marital status
+              table(data$VPKCombined$MaritalStatus)
+            #income & adjincome, 
+              table(data$VPKCombined$HouseHoldIncome)
+              table(data$VPKCombined$AdjHouseHoldIncome)
+            # of children needing care-> we have # of kids entering KG and HH Size...
+              table(data$VPKCombined$NumChildrenEnteringKG)
+            #preferred amount of money, adjusted
+              table(data$VPKCombined$WillingToSpend)
+              table(data$VPKCombined$AdjWillingToSpend)
+            #transportation, 
+              table(data$VPKCombined$PrimaryTransportationMode)
+            #ages of children needing care (collapsing across all ages - one value per row),
+              #not in VPK, only in SR
+            #parent education
+              table(data$VPKCombined$Education)
+          
+              
+data$VPKCombined$PrimaryTransportationMode[data$VPKCombined$PrimaryTransportationMode=="Walking"]="Walking/Bicycle"
+data$VPKCombined$PrimaryTransportationMode[data$VPKCombined$PrimaryTransportationMode=="Bicycle"]="Walking/Bicycle"
+
+data$VPKCombined$MaritalStatus[data$VPKCombined$MaritalStatus=="Living with partner in same household"]="Living with partner in same household/Married"
+data$VPKCombined$MaritalStatus[data$VPKCombined$MaritalStatus=="Married"]="Living with partner in same household/Married"
+
+data$VPKCombined$MaritalStatus[data$VPKCombined$MaritalStatus=="Single"]="Widowed/Divorced/Separated/Single"
+data$VPKCombined$MaritalStatus[data$VPKCombined$MaritalStatus=="Divorced/Separated"]="Widowed/Divorced/Separated/Single"
+data$VPKCombined$MaritalStatus[data$VPKCombined$MaritalStatus=="Widowed"]="Widowed/Divorced/Separated/Single"
+
+data$VPKCombined$NumAdultsHH[data$VPKCombined$MaritalStatus=="Living with partner in same household/Married"]=2
+data$VPKCombined$NumAdultsHH[data$VPKCombined$MaritalStatus=="Widowed/Divorced/Separated/Single"]=1
+
+
+
+data$VPKCombined$AdultAdjHouseHoldIncome=apply(data$VPKCombined, 1, function(row){
+
+  if(!any(is.na(row[c("HouseHoldIncome","NumAdultsHH")]))){
+    
+    inc=switch(row["HouseHoldIncome"],
+      "Less than $14,000"=14000,
+      "$100,000 or more"=100000,
+      "$15,000 to 19,000"=15000,
+      "$20,000 to 29,000"=20000,
+      "$30,000 to $39,000"=30000,
+      "$40,000 to $49,000"=40000,
+      "$50,000 to $74,000"=50000,
+      "$75,000 to $100,000"=75000,
+      "Prefer not to answer"=NA)
+
+  
+    out=as.numeric(as.numeric(inc)/as.numeric(row["NumAdultsHH"]))
+  }else{out=NA}
+  out
+})
+              
+              
+              
+              
+              
+              
+d=data$VPKCombined
+  for(c in names(d)){
+      if(class(d[,c])=="character"){d[,c]=as.factor(d[,c])}
+      if(grepl("Trbl",c)){d[,c]=as.factor(d[,c])}   
+      }
+
+for(v in c("Trbl_NoChlgns", "Trbl_Expnsv", "Trbl_NoPubSchls", "Trbl_Other", "MaritalStatus", "HouseHoldIncome", "AdjHouseHoldIncome", "NumChildrenEnteringKG", "WillingToSpend", "AdjWillingToSpend", "PrimaryTransportationMode", "Education")){
+  print(paste0("Variable: ",v,", format -> ",class(d[,v])))
+  
+}
+
+
+
+
+set.seed(27)
+#install.packages("partykit")
+library(partykit)
+#install.packages("party")
+library(party)
+
+
+# 
+# mod.VPK=ctree(Trbl_NoChlgns + Trbl_Expnsv + Trbl_NoPubSchls + Trbl_Other ~  MaritalStatus + HouseHoldIncome + NumChildrenEnteringKG + WillingToSpend2 + PrimaryTransportationMode + Education,
+#                    data=d,
+#                controls=ctree_control(minbucket=.01*nrow(d)))
+# png("out.png",1200,1200)
+# plot(mod.VPK)
+# dev.off()
+# 
+
+d$WillingToSpend2=unlist(sapply(d$WillingToSpend, function(x){
+  if(!is.na(x)){
+    out=switch(
+          as.character(x),
+          "$0-25"=0 ,
+            "$25-50"=1,
+          "$50-75"=2,
+          "$75-100"=3,
+          "$100-150"=4,
+          "Greater than $150"=5)}
+    else{out=NA}
+    out
+    }))
+# 
+# ####
+# mod.VPK2=ctree(Trbl_NoPubSchls ~  MaritalStatus + HouseHoldIncome + NumChildrenEnteringKG + WillingToSpend2 + PrimaryTransportationMode + Education,
+#                    data=d,
+#                controls=ctree_control(minbucket=.01*nrow(d)))
+# 
+# ###
+# ####
+# mod.VPK3=ctree(Trbl_NoPubSchls ~  MaritalStatus + HouseHoldIncome + NumChildrenEnteringKG + WillingToSpend2 + PrimaryTransportationMode,
+#                    data=d,
+#                controls=ctree_control(minbucket=.01*nrow(d)))
+# 
+# ####
+# mod.VPK4=ctree(Trbl_NoPubSchls ~  MaritalStatus + AdultAdjHouseHoldIncome + NumChildrenEnteringKG + WillingToSpend2 + PrimaryTransportationMode,
+#                    data=d,
+#                controls=ctree_control(minbucket=.01*nrow(d)))
+# 
+# ####
+# mod.VPK5=ctree(Trbl_NoPubSchls ~  MaritalStatus + HouseHoldIncome + NumChildrenEnteringKG + WillingToSpend2 + PrimaryTransportationMode,
+#                    data=d,
+#                controls=ctree_control(minbucket=.01*nrow(d)))
+# 
+# plot(mod.VPK5)
+# 
+# ####
+# mod.VPK6=ctree(Trbl_Expnsv ~  MaritalStatus + HouseHoldIncome + NumChildrenEnteringKG + WillingToSpend2 + PrimaryTransportationMode,
+#                    data=d,
+#                controls=ctree_control(minbucket=.01*nrow(d)))
+# 
+# plot(mod.VPK6)
+# 
+# ####
+# mod.VPK7=ctree(Trbl_NoChlgns ~  MaritalStatus + HouseHoldIncome + NumChildrenEnteringKG + WillingToSpend2 + PrimaryTransportationMode + Why_AlternCare + Why_StayFam + Why_StayHome,
+#                    data=d,
+#                controls=ctree_control(minbucket=.01*nrow(d)))
+# 
+# plot(mod.VPK7)
+# 
+# ####
+# mod.VPK8=ctree(Why_AlternCare ~  MaritalStatus + HouseHoldIncome + NumChildrenEnteringKG + WillingToSpend2 + PrimaryTransportationMode + Trbl_NoChlgns,
+#                    data=d,
+#                controls=ctree_control(minbucket=.01*nrow(d)))
+# 
+# plot(mod.VPK8)
+# 
+# ####
+# mod.VPK9=ctree(Why_AlternCare ~  MaritalStatus + HouseHoldIncome + NumChildrenEnteringKG + WillingToSpend2 + PrimaryTransportationMode + Trbl_NoPubSchls  + Trbl_NoPvtSchls + Trbl_Expnsv + Trbl_Location + Trbl_Other + Trbl_NoChlgns + Trbl_Quality + Trbl_NoFit + Trbl_Comfort + Trbl_NoHours + Trbl_Language,
+#                    data=d,
+#                controls=ctree_control(minbucket=.01*nrow(d)))
+# 
+# plot(mod.VPK9)
+# 
+# ####
+# mod.VPK10=ctree(d$Why_StayHome ~  MaritalStatus + HouseHoldIncome + NumChildrenEnteringKG + WillingToSpend2 + PrimaryTransportationMode + Trbl_NoPubSchls  + Trbl_NoPvtSchls + Trbl_Expnsv + Trbl_Location + Trbl_Other + Trbl_NoChlgns + Trbl_Quality + Trbl_NoFit + Trbl_Comfort + Trbl_NoHours + Trbl_Language,
+#                    data=d,
+#                controls=ctree_control(minbucket=.01*nrow(d)))
+# 
+# plot(mod.VPK10)
+# 
+# 
+# ####
+# mod.VPK11=ctree(d$Why_StayFam ~  MaritalStatus + HouseHoldIncome + NumChildrenEnteringKG + WillingToSpend2 + PrimaryTransportationMode + Trbl_NoPubSchls  + Trbl_NoPvtSchls + Trbl_Expnsv + Trbl_Location + Trbl_Other + Trbl_NoChlgns + Trbl_Quality + Trbl_NoFit + Trbl_Comfort + Trbl_NoHours + Trbl_Language,
+#                    data=d,
+#                controls=ctree_control(minbucket=5))
+# 
+# plot(mod.VPK11)
+
+
+#Keep Mod 7 & Mod 9 (below)
+
+mod.VPK7=ctree(Trbl_NoChlgns ~  MaritalStatus + HouseHoldIncome + NumChildrenEnteringKG + WillingToSpend2 + PrimaryTransportationMode + Why_AlternCare + Why_StayFam + Why_StayHome,
+                   data=d,
+               controls=ctree_control(minbucket=.01*nrow(d)))
+
+plot(mod.VPK7)
+
+mod.VPK9=ctree(Why_AlternCare ~  MaritalStatus + HouseHoldIncome + NumChildrenEnteringKG + WillingToSpend2 + PrimaryTransportationMode + Trbl_NoPubSchls  + Trbl_NoPvtSchls + Trbl_Expnsv + Trbl_Location + Trbl_Other + Trbl_NoChlgns + Trbl_Quality + Trbl_NoFit + Trbl_Comfort + Trbl_NoHours + Trbl_Language,
+                   data=d,
+               controls=ctree_control(minbucket=.01*nrow(d)))
+plot(mod.VPK9)
+
+
+mod.VPK12=ctree(Why_AlternCare ~  MaritalStatus + HouseHoldIncome + NumChildrenEnteringKG + WillingToSpend2 + PrimaryTransportationMode + Trbl_NoPubSchls  + Trbl_NoPvtSchls + Trbl_Expnsv + Trbl_Location + Trbl_Other + Trbl_NoChlgns + Trbl_Comfort + Trbl_NoHours + Trbl_Language,
+                   data=d,
+               controls=ctree_control(minbucket=.01*nrow(d)))
+plot(mod.VPK12)
+
+###########
+d$Why_AlternCare2=as.factor(d$Why_AlternCare)
+mod.VPK9_2=ctree(Why_AlternCare2 ~  MaritalStatus + HouseHoldIncome + NumChildrenEnteringKG + WillingToSpend2 + PrimaryTransportationMode + Trbl_NoPubSchls  + Trbl_NoPvtSchls + Trbl_Expnsv + Trbl_Location + Trbl_Other + Trbl_NoChlgns + Trbl_Quality  Trbl_NoFit + Trbl_Comfort + Trbl_NoHours + Trbl_Language,
+                data=d,
+                controls=ctree_control(minbucket=.01*nrow(d)))
+
+
+
+
+
+# png("out9_2.png",1200,1200)
+# plot(mod.VPK10)
+# dev.off()
+
+```
+  
+      
+
+```{r}
+
+
+
+temp <- as.POSIXct( unique(data$VPKCombined$ProviderOpensAM) , format = "%H:%M" , tz = "GMT")
+
+t=table(data$VPKCombined$ProviderOpensAM, data$VPKCombined$ProviderClosesPM, useNA = "always")
+
+OpenOrder=unique(data$VPKCombined$ProviderOpensAM)[order(as.POSIXct(unique(data$VPKCombined$ProviderOpensAM) , format = "%H:%M" , tz = "GMT") , decreasing = FALSE )]
+ClosedOrder=unique(data$VPKCombined$ProviderClosesPM)[order(as.POSIXct( unique(data$VPKCombined$ProviderClosesPM) , format = "%H:%M" , tz = "GMT"), decreasing = FALSE )]
+
+
+    png("ProviderOpenAM_Revised.png")
+       par(mar = c(12.1, 4.1, 4.1, 2.1))
+        par(las=2)
+        t=table(data$VPKCombined$ProviderOpensAM)
+        b=barplot(t[OpenOrder], ylim=c(0,max(t)*1.2))
+        text(b, t[OpenOrder] + max(t)*0.1, t)
+      dev.off()
+
+  png("ProviderClosedPM_Revised.png")
+
+   par(mar = c(12.1, 4.1, 4.1, 2.1))
+        par(las=2)
+        t=table(data$VPKCombined$ProviderClosesPM)
+        b=barplot(t[ClosedOrder], ylim=c(0,max(t)*1.2))
+        text(b, t[ClosedOrder] + max(t)*0.1, t)
+      dev.off()
+```
+
+
+```{r}
+
+round(prop.table(table(data$VPKCombined$Education[(data$VPKCombined$Trbl_NoFit==0 & data$VPKCombined$Trbl_Quality==0)])),2)
+round(prop.table(table(data$VPKCombined$Education[(data$VPKCombined$Trbl_NoFit==1 & data$VPKCombined$Trbl_Quality==1)])),2)
+
+
+t1=round(prop.table(table(d$HouseHoldIncome[(d$Trbl_NoFit==0 & d$Trbl_Quality==0)])),2)
+t2=round(prop.table(table(d$HouseHoldIncome[(d$Trbl_NoFit==1 & d$Trbl_Quality==1)])),2)
+
+View(cbind(
+"NoFitIssue"=round(prop.table(table(d$Education[(d$Trbl_NoFit==0 )])),2),
+"NotreportedFit"=round(prop.table(table(d$Education[(d$Trbl_NoFit==1 )])),2),
+"Diff"=round(prop.table(table(d$Education[(d$Trbl_NoFit==0 )])),2)-
+round(prop.table(table(d$Education[(d$Trbl_NoFit==1 )])),2)))
+
+
+
+round(prop.table(table(d$HouseHoldIncome[(d$Trbl_NoFit==0 )])),2)
+round(prop.table(table(d$HouseHoldIncome[(d$Trbl_NoFit==1 )])),2)
+
+
+# Fit/Quality problems in finding child care by education
+prop.table(table(d$Trbl_NoFit==1,d$Education), margin=2)
+prop.table(table(d$Trbl_Quality==1,d$Education), margin=2)
+prop.table(table((d$Trbl_Quality==1 & d$Trbl_NoFit==1) ,d$Education), margin=2)
+
+# Fit/Quality problems in finding child care by income
+prop.table(table(d$Trbl_NoFit==1,d$HouseHoldIncome), margin=2)
+prop.table(table(d$Trbl_Quality==1,d$HouseHoldIncome), margin=2)
+prop.table(table((d$Trbl_Quality==1 & d$Trbl_NoFit==1),d$HouseHoldIncome), margin=2)
+
+
+```
+
+
+
+```{r}
+
+##mod 7
+round(prop.table(table("NoChlgns"=d$Trbl_NoChlgns[d$Why_AlternCare2==0], d$HHISplit[d$Why_AlternCare2==0]),margin=2),3)*100
+
+
+##mod 9
+round(prop.table(table("AltCare"=d$Why_AlternCare2, d$Trbl_NoChlgns),margin=2),3)*100
+
+round(prop.table(table("AltCare"=d$Why_AlternCare2[d$Trbl_NoChlgns==0], d$HHISplit[d$Trbl_NoChlgns==0]),margin=2),3)*100
+
+
+round(prop.table(table("AltCare"=d$Why_AlternCare2[d$Trbl_NoChlgns==0 & d$HHISplit==TRUE], d$Trbl_NoPubSchls[d$HHISplit==TRUE & d$Trbl_NoChlgns==0]),margin=2),3)*100
+
+round(prop.table(table("AltCare"=d$Why_AlternCare2[d$Trbl_NoChlgns==0 & d$HHISplit==FALSE], d$Trbl_NoHours[d$HHISplit==FALSE & d$Trbl_NoChlgns==0]),margin=2),3)*100
+
+
+round(prop.table(table("AltCare"=d$Why_AlternCare2[d$Trbl_NoChlgns==0 & d$HHISplit==FALSE & d$Trbl_NoHours==0], d$Trbl_NoFit[d$Trbl_NoChlgns==0 & d$HHISplit==FALSE & d$Trbl_NoHours==0]),margin=2),3)*100
+
+
+round(prop.table(table("AltCare"=d$Why_AlternCare2[d$Trbl_NoChlgns==0 & d$HHISplit==FALSE & d$Trbl_NoHours==0 & d$Trbl_NoFit==0], d$Trbl_Quality[d$Trbl_NoChlgns==0 & d$HHISplit==FALSE & d$Trbl_NoHours==0 & d$Trbl_NoFit==0]),margin=2),3)*100
+
+
+```
+
+
+
+

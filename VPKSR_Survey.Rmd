@@ -1,0 +1,990 @@
+---
+title: "VPKSR_Survey"
+author: "RobertChapman"
+date: "2023-12-7"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Analyis plan from Phil 12/4
+#### SR
+
+    Analysis 1: Price of Care a prohibitive factor <- CTree
+        Outcome variable: Childcare too expensive, coded as dichotomous (either too expensive or not)
+        Predictors:  Marital status, (combining married & living with partners), income, # of children needing care, preferred amount of money, transportation, ages of children needing care (collapsing across all ages - one value per row), parent education
+    
+    Analysis 2: Cross tabs/descriptives
+        Preferred distance by mode of transportation
+        ^Split by people who did/didnt endorse pref for ‘conveniently located’
+        Provider quality with parent education  
+        "Provider not open during hours I need" vs Ranges for open/closed preferences
+        Ranges for open/closed preferences <- general for everyone 
+    
+#### VPK:
+    
+    No longer needed care
+        Household Size distribution
+        Income distribution 
+        marital status frequencies
+        what responses do they select for reasons having trouble finding a provider
+    
+    Section 2: Stay at home with child 
+        Household Size distribution
+        Income distribution 
+        marital status frequencies
+        what responses do they select for reasons having trouble finding a provider
+    
+    Section 3: Alternative care
+        Household Size distribution
+        Income distribution 
+        marital status frequencies
+        what responses do they select for reasons having trouble finding a provider
+
+### Discussion with Herman and Phil, 12/5
+#### Additional analyses
+
+      Adjusted income:
+      Income/# of folks in household-> (range)
+      
+      Calc -> adjusted to money willing to spend per child (adj range)
+      Price per kid
+      
+      Dig deeper on categories for specific reasons for trouble finding providers (try to identify characteristics)
+      
+      Trees -> VPK Outcome (Other, Didn’t Experience Challenges, Expensive, public)
+
+
+## Loading
+
+```{r loadingrecodingdata}
+
+########################################################################################
+### SR English #########################################################################
+########################################################################################
+
+#SR English
+#SREnglish=read.csv("SR Families - Final_December 8, 2023_15.06.csv", skip=1)[-1,]
+SREnglish=read.delim2("SR Families - Final_December 10, 2023_10.15.tsv", fileEncoding = "UCS-2LE",skip=1)[-1,]
+SREnglish[SREnglish==""]=NA
+SREnglish=SREnglish[order(apply(SREnglish[,18:ncol(SREnglish)],1,function(c){sum(is.na(c))})),]
+    
+### Renaming
+    names(SREnglish)[grep("agree.to.participate",names(SREnglish))]="Consent"
+
+    names(SREnglish)[names(SREnglish)=="Our.records.show.that.you.completed.an.application.for.Florida.School.Readiness.program..ELC.voucher.subsidy..but.did.not.enroll.in.the.program..Is.this.correct."]="Screener"
+
+    names(SREnglish)[names(SREnglish)=="What.is.your.county.of.residence....1"]="CountyOfResidence"
+    names(SREnglish)[names(SREnglish)=="What.is.the.primary.reason.that.you.did.not.participate.in.the.Florida.School.Readiness.program..ELC.voucher.subsidy.."]="PrimaryReasonNotParticipate"
+    names(SREnglish)[names(SREnglish)=="If.you.no.longer.needed.childcare.for.your.child.ren...why.did.you.no.longer.need.it..Select.all.that.apply."]="WhyNoLongerNeeded"
+    names(SREnglish)[names(SREnglish)=="If.you.had.trouble.finding.childcare..please.select.all.of.the.reasons.that.apply."]="TroubleFindingChildcare"
+    names(SREnglish)[names(SREnglish)=="What.are.the.most.important.characteristics.that.you.want.in.a.childcare.provider.....Please.rank.the.following.options.from.most.important..1..to.least.important..6..by.dragging.and.dropping.the.answer.choices.in.the.order.of.importance.to.you....Price"]="ImportantCharacteristicsPrice"
+    names(SREnglish)[names(SREnglish)=="What.are.the.most.important.characteristics.that.you.want.in.a.childcare.provider.....Please.rank.the.following.options.from.most.important..1..to.least.important..6..by.dragging.and.dropping.the.answer.choices.in.the.order.of.importance.to.you....Location"]="ImportantCharacteristicsLocation"
+    names(SREnglish)[names(SREnglish)=="What.are.the.most.important.characteristics.that.you.want.in.a.childcare.provider.....Please.rank.the.following.options.from.most.important..1..to.least.important..6..by.dragging.and.dropping.the.answer.choices.in.the.order.of.importance.to.you....Quality"]="ImportantCharacteristicsQuality"
+    names(SREnglish)[names(SREnglish)=="What.are.the.most.important.characteristics.that.you.want.in.a.childcare.provider.....Please.rank.the.following.options.from.most.important..1..to.least.important..6..by.dragging.and.dropping.the.answer.choices.in.the.order.of.importance.to.you....Hours.of.operation"]="ImportantCharacteristicsHours"
+    names(SREnglish)[names(SREnglish)=="What.are.the.most.important.characteristics.that.you.want.in.a.childcare.provider.....Please.rank.the.following.options.from.most.important..1..to.least.important..6..by.dragging.and.dropping.the.answer.choices.in.the.order.of.importance.to.you....Teacher.qualifications"]="ImportantCharacteristicsTeacherQualif"
+    names(SREnglish)[names(SREnglish)=="What.are.the.most.important.characteristics.that.you.want.in.a.childcare.provider.....Please.rank.the.following.options.from.most.important..1..to.least.important..6..by.dragging.and.dropping.the.answer.choices.in.the.order.of.importance.to.you....Preferred.language"]="ImportantCharacteristicsLanguage"
+    names(SREnglish)[names(SREnglish)=="How.many.children.do.you.have.that.need.childcare."]="NumChildrenNeedingCare"
+    names(SREnglish)[names(SREnglish)=="How.much.are.you.willing.to.spend.on.childcare.per.week.for.your..QID9.ChoiceGroup.SelectedChoices..who.need.care."]="WillingToSpend"
+    names(SREnglish)[names(SREnglish)=="For.what.age.s..were.you.not.able.to.find.an.opening..Select.all.that.apply."]="AgeUnableToFindOpenings"
+    names(SREnglish)[names(SREnglish)=="Were.you.looking.for.care.closer.to..."]="PreferredProviderCloseTo"
+    names(SREnglish)[names(SREnglish)=="What.is.your.primary.mode.of.transportation."]="PrimaryTransportationMode"
+    names(SREnglish)[names(SREnglish)=="How.far.from..QID11.ChoiceGroup.SelectedChoices..would.you.like.your.childcare.provider.to.be.located."]="PreferredTravelDistance"
+    names(SREnglish)[names(SREnglish)=="Provider.opens.at.....AM."]="ProviderOpensAM"
+    names(SREnglish)[names(SREnglish)=="Provider.closes.at.....PM."]="ProviderClosesPM"                 
+
+    names(SREnglish)[names(SREnglish)=="What.is.your.household.size..Including.yourself..all.children..and.all.adults.currently.living.in.your.home."]="HouseHoldSize"
+    
+    names(SREnglish)[names(SREnglish)=="What.is.your.marital.status."]="MaritalStatus"
+    
+    names(SREnglish)[names(SREnglish)=="Please.select.the.language.that.you.most.commonly.speak.at.home."]="HomeLanguage"
+
+    
+    names(SREnglish)[names(SREnglish)=="How.well.do.you.speak.English."]="EnglishProficiency"
+    
+    names(SREnglish)[names(SREnglish)=="Which.of.the.following.categories.do.you.think.best.describes.your.total.household.income.last.year..wages.and.salaries.from.all.jobs.."]="HouseHoldIncome"
+    
+    names(SREnglish)[names(SREnglish)=="What.is.the.highest.grade.or.level.of.schooling.that.you.have.completed."]="Education"
+    
+    names(SREnglish)[names(SREnglish)=="What.is.your.current.employment.status."]="Employment"
+    names(SREnglish)[names(SREnglish)=="Are.you.enrolled.in.school.or.a.career.technical.training.program."]="EnrolledEducation"
+    names(SREnglish)[names(SREnglish)=="What.is.your.ethnicity."]="Ethnicity"
+    names(SREnglish)[names(SREnglish)=="What.is.your.race..Select.one.or.more."]="Race" 
+
+############################################################################################    
+### SR Spanish #############################################################################
+############################################################################################    
+
+#SR Spanish
+#SRSpanish=read.csv("SR Families - Final - Spanish_December 8, 2023_15.06.csv", skip=1)[-1,]
+SRSpanish=read.delim2("SR Families - Final - Spanish_December 10, 2023_10.16.tsv", fileEncoding = "UCS-2LE",skip=1)[-1,]
+SRSpanish[SRSpanish==""]=NA
+SRSpanish=SRSpanish[order(apply(SRSpanish[,18:ncol(SRSpanish)],1,function(c){sum(is.na(c))})),]
+
+    
+names(SRSpanish)[grep("acepta.participar",names(SRSpanish))]="Consent"
+
+names(SRSpanish)[names(SRSpanish)=="Nuestros.registros.muestran.que.usted.completó.una.aplicación.para.el.programa.de..Florida.School.Readiness...subsidio.de.ELC...pero.no.se.inscribió.en.el.programa...Es.esto.correcto."]="Screener"
+
+names(SRSpanish)[names(SRSpanish)=="X.Cuál.es.su.condado.de.residencia."]="CountyOfResidence"
+names(SRSpanish)[names(SRSpanish)=="X.Cuál.es.la.razón.principal.por.la.que.no.participó.en.el.programa.de..Florida.School.Readiness...subsidio.de.ELC.."]="PrimaryReasonNotParticipate"
+names(SRSpanish)[names(SRSpanish)=="Si.ya.no.necesitaba.los.servicios.de.VPK.para.su.s..hijo.s..hija.s....por.qué.ya.no.los.necesitaba..Seleccione.todo.lo.que.corresponda."]="WhyNoLongerNeeded"
+names(SRSpanish)[names(SRSpanish)=="Si.ya.no.necesitaba.cuidado.infantil.para.su.s..hijo.s..hija.s....por.qué.ya.no.los.necesitaba..Seleccione.todo.lo.que.corresponda."]= "WhyNoLongerNeeded"
+names(SRSpanish)[names(SRSpanish)=="Si.tuvo.problemas.para.encontrar.un.cuidador.infantil.para.su.s..hijo.s..hija.s....cuáles.fueron.las.razones..Seleccione.todo.lo.que.corresponda."]="TroubleFindingChildcare"
+names(SRSpanish)[names(SRSpanish)=="X.Cuáles.son.las.características.más.importantes.que.desea.en.un.cuidador.infantil.para.su.s..hijo.s..hija.s......Clasifique.las.siguientes.opciones.desde.la.más.importante..1..hasta.la.menos.importante..6..arrastrando.y.soltando.las.opciones.de.respuesta.en.el.orden.de.importancia.para.usted....Precio"]="ImportantCharacteristicsPrice"
+names(SRSpanish)[names(SRSpanish)=="X.Cuáles.son.las.características.más.importantes.que.desea.en.un.cuidador.infantil.para.su.s..hijo.s..hija.s......Clasifique.las.siguientes.opciones.desde.la.más.importante..1..hasta.la.menos.importante..6..arrastrando.y.soltando.las.opciones.de.respuesta.en.el.orden.de.importancia.para.usted....Ubicación"]="ImportantCharacteristicsLocation"
+names(SRSpanish)[names(SRSpanish)=="X.Cuáles.son.las.características.más.importantes.que.desea.en.un.cuidador.infantil.para.su.s..hijo.s..hija.s......Clasifique.las.siguientes.opciones.desde.la.más.importante..1..hasta.la.menos.importante..6..arrastrando.y.soltando.las.opciones.de.respuesta.en.el.orden.de.importancia.para.usted....Calidad"]="ImportantCharacteristicsQuality"
+names(SRSpanish)[names(SRSpanish)=="X.Cuáles.son.las.características.más.importantes.que.desea.en.un.cuidador.infantil.para.su.s..hijo.s..hija.s......Clasifique.las.siguientes.opciones.desde.la.más.importante..1..hasta.la.menos.importante..6..arrastrando.y.soltando.las.opciones.de.respuesta.en.el.orden.de.importancia.para.usted....Horas.de.operación"]="ImportantCharacteristicsHours"
+names(SRSpanish)[names(SRSpanish)=="X.Cuáles.son.las.características.más.importantes.que.desea.en.un.cuidador.infantil.para.su.s..hijo.s..hija.s......Clasifique.las.siguientes.opciones.desde.la.más.importante..1..hasta.la.menos.importante..6..arrastrando.y.soltando.las.opciones.de.respuesta.en.el.orden.de.importancia.para.usted....Calificaciones.de.los.profesores"]="ImportantCharacteristicsTeacherQualif"
+names(SRSpanish)[names(SRSpanish)=="X.Cuáles.son.las.características.más.importantes.que.desea.en.un.cuidador.infantil.para.su.s..hijo.s..hija.s......Clasifique.las.siguientes.opciones.desde.la.más.importante..1..hasta.la.menos.importante..6..arrastrando.y.soltando.las.opciones.de.respuesta.en.el.orden.de.importancia.para.usted....Idioma.preferido"]="ImportantCharacteristicsLanguage"
+names(SRSpanish)[names(SRSpanish)=="Cuántos.hijos.hijas.tiene.que.necesitan.cuidado.infantil."]= "NumChildrenNeedingCare"
+names(SRSpanish)[names(SRSpanish)=="X.Cuánto.está.dispuesto.a.a.gastar.en.cuidado.infantil..por.semana.para.su.s...QID9.ChoiceGroup.SelectedChoices..que.necesita.n..cuidado."]="WillingToSpend"
+names(SRSpanish)[names(SRSpanish)=="X.Para.qué.edades.no.pudo.encontrar.un.espacio.vacante..Seleccione.todo.lo.que.corresponda."]="AgeUnableToFindOpenings"
+names(SRSpanish)[names(SRSpanish)=="Estaba.buscando.cuidado.más.cercano.a..."]="PreferredProviderCloseTo"
+names(SRSpanish)[names(SRSpanish)=="X.Cuál.es.su.método.principal.de.transporte."]= "PrimaryTransportationMode"
+names(SRSpanish)[names(SRSpanish)=="X.A.qué.distancia.de..QID11.ChoiceGroup.SelectedChoices..le.gustaría.que.estuviera.ubicado.su.cuidado.infantil."]="PreferredTravelDistance"
+names(SRSpanish)[names(SRSpanish)=="El.proveedor.abre.a.las.....AM."]="ProviderOpensAM"
+names(SRSpanish)[names(SRSpanish)=="El.proveedor.cierra.a.las.....PM."]="ProviderClosesPM"
+names(SRSpanish)[names(SRSpanish)=="X.Cuál.es.el.tamaño.de.su.hogar..Incluido.usted..todos.los.niños.y.todos.los.adultos.que.viven.actualmente.en.su.hogar."]="HouseHoldSize"
+names(SRSpanish)[names(SRSpanish)=="X.Cuál.es.tu.estado.civil."]="MaritalStatus"
+names(SRSpanish)[names(SRSpanish)=="Seleccione.el.idioma.que.habla.con.más.frecuencia.en.casa."]="HomeLanguage"
+names(SRSpanish)[names(SRSpanish)=="X.Que.tan.bien.hablas.inglés."]="EnglishProficiency"
+
+names(SRSpanish)[names(SRSpanish)=="X.Cuál.de.las.siguientes.categorías.cree.que.describe.mejor.el.ingreso.total.de.su.hogar.el.año.pasado..sueldos.y.salarios.de.todos.los.trabajos.."]="HouseHoldIncome"
+names(SRSpanish)[names(SRSpanish)=="X.Cúal.es.el.mayor.grado.o.nivel.escolar.que.usted.ha.completado."]="Education"
+names(SRSpanish)[names(SRSpanish)=="X.Cuál.es.su.situación.laboral.actual."]="Employment"
+names(SRSpanish)[names(SRSpanish)=="X.Estás.actualmente.inscrito.a.en.una.escuela.o.en.un.programa.de.entrenamiento.técnico.o.profesional."]="EnrolledEducation"
+names(SRSpanish)[names(SRSpanish)=="X.Cuál.es.su.etnia."]="Ethnicity"
+names(SRSpanish)[names(SRSpanish)=="X.Cuál.es.su.raza..Seleccione.todo.lo.que.corresponda." ]="Race"
+    
+
+############################################################################################
+### VPK English ############################################################################
+############################################################################################
+
+#VPK English
+#VPKEnglish=read.csv("VPK Families - Final_December 8, 2023_15.07.csv", skip=1)[-1,]
+VPKEnglish=read.delim2("VPK Families - Final_December 10, 2023_10.16.tsv", fileEncoding = "UCS-2LE",skip=1)[-1,]
+VPKEnglish[VPKEnglish==""]=NA
+VPKEnglish=VPKEnglish[order(apply(VPKEnglish[,18:ncol(VPKEnglish)],1,function(c){sum(is.na(c))})),]
+    
+### Renaming
+    names(VPKEnglish)[grep("agree.to.participate",names(VPKEnglish))]="Consent"
+
+    names(VPKEnglish)[names(VPKEnglish)=="Our.records.show.that.you.completed.an.application.for.Florida.s.VPK.program.but.did.not.enroll.in.the.program..Is.this.correct."]="Screener"
+
+    names(VPKEnglish)[names(VPKEnglish)=="What.is.your.county.of.residence....5"]="CountyOfResidence"
+    names(VPKEnglish)[names(VPKEnglish)=="What.is.the.primary.reason.that.you.did.not.participate.in.the.VPK.program."]="PrimaryReasonNotParticipate"
+    names(VPKEnglish)[names(VPKEnglish)=="If.you.no.longer.needed.VPK.services.for.your.child.ren...why.did.you.no.longer.need.it..Select.all.that.apply."]="WhyNoLongerNeeded"
+    names(VPKEnglish)[names(VPKEnglish)=="If.you.had.trouble.finding.a.provider..what.were.the.reasons..Select.all.that.apply."]="TroubleFindingChildcare"
+    names(VPKEnglish)[names(VPKEnglish)=="What.are.the.most.important.characteristics.that.you.want.in.a.VPK.provider.....Please.rank.the.following.options.from.most.important..1..to.least.important..6..by.dragging.and.dropping.the.answer.choices.in.the.order.of.importance.to.you....Price"]="ImportantCharacteristicsPrice"
+    names(VPKEnglish)[names(VPKEnglish)=="What.are.the.most.important.characteristics.that.you.want.in.a.VPK.provider.....Please.rank.the.following.options.from.most.important..1..to.least.important..6..by.dragging.and.dropping.the.answer.choices.in.the.order.of.importance.to.you....Location"]="ImportantCharacteristicsLocation"
+    names(VPKEnglish)[names(VPKEnglish)=="What.are.the.most.important.characteristics.that.you.want.in.a.VPK.provider.....Please.rank.the.following.options.from.most.important..1..to.least.important..6..by.dragging.and.dropping.the.answer.choices.in.the.order.of.importance.to.you....Quality"]="ImportantCharacteristicsQuality"
+    names(VPKEnglish)[names(VPKEnglish)=="What.are.the.most.important.characteristics.that.you.want.in.a.VPK.provider.....Please.rank.the.following.options.from.most.important..1..to.least.important..6..by.dragging.and.dropping.the.answer.choices.in.the.order.of.importance.to.you....Hours.of.operation"]="ImportantCharacteristicsHours"
+    names(VPKEnglish)[names(VPKEnglish)=="What.are.the.most.important.characteristics.that.you.want.in.a.VPK.provider.....Please.rank.the.following.options.from.most.important..1..to.least.important..6..by.dragging.and.dropping.the.answer.choices.in.the.order.of.importance.to.you....Teacher.qualifications"]="ImportantCharacteristicsTeacherQualif"
+    names(VPKEnglish)[names(VPKEnglish)=="What.are.the.most.important.characteristics.that.you.want.in.a.VPK.provider.....Please.rank.the.following.options.from.most.important..1..to.least.important..6..by.dragging.and.dropping.the.answer.choices.in.the.order.of.importance.to.you....Preferred.language"]="ImportantCharacteristicsLanguage"
+    names(VPKEnglish)[names(VPKEnglish)=="How.many.children.do.you.have.that.will.enter.Kindergarten.next.year."]="NumChildrenEnteringKG"
+    names(VPKEnglish)[names(VPKEnglish)=="How.much.are.you.willing.to.spend.on.before.and.or.after.care..wrap.around.services..per.week.for.your..QID9.ChoiceGroup.SelectedChoices..who.need.s..services."]="WillingToSpend"
+    names(VPKEnglish)[names(VPKEnglish)=="Were.you.looking.for.a.VPK.provider.closer.to..."]="PreferredProviderCloseTo"
+    names(VPKEnglish)[names(VPKEnglish)=="Were.you.looking.for.care.closer.to..."]="LookingForCareCloser"
+    names(VPKEnglish)[names(VPKEnglish)=="What.is.your.primary.mode.of.transportation."]="PrimaryTransportationMode"
+    names(VPKEnglish)[names(VPKEnglish)=="How.far.from..QID11.ChoiceGroup.SelectedChoices..would.you.like.your.VPK.provider.to.be.located."]="PreferredTravelDistance"
+    names(VPKEnglish)[names(VPKEnglish)=="Provider.opens.at.....AM."]="ProviderOpensAM"
+    names(VPKEnglish)[names(VPKEnglish)=="Provider.closes.at.....PM."]="ProviderClosesPM"                 
+
+    names(VPKEnglish)[names(VPKEnglish)=="What.is.your.household.size..Including.yourself..all.children..and.all.adults.currently.living.in.your.home."]="HouseHoldSize"
+    
+    names(VPKEnglish)[names(VPKEnglish)=="What.is.your.marital.status."]="MaritalStatus"
+    
+    names(VPKEnglish)[names(VPKEnglish)=="Please.select.the.language.that.you.most.commonly.speak.at.home."]="HomeLanguage"
+
+    
+    names(VPKEnglish)[names(VPKEnglish)=="How.well.do.you.speak.English."]="EnglishProficiency"
+    
+    names(VPKEnglish)[names(VPKEnglish)=="Which.of.the.following.categories.do.you.think.best.describes.your.total.household.income.last.year..wages.and.salaries.from.all.jobs.."]="HouseHoldIncome"
+    
+    names(VPKEnglish)[names(VPKEnglish)=="What.is.the.highest.grade.or.level.of.schooling.that.you.have.completed."]="Education"
+    
+    names(VPKEnglish)[names(VPKEnglish)=="What.is.your.current.employment.status."]="Employment"
+    names(VPKEnglish)[names(VPKEnglish)=="Are.you.enrolled.in.school.or.a.career.technical.training.program."]="EnrolledEducation"
+    names(VPKEnglish)[names(VPKEnglish)=="What.is.your.ethnicity."]="Ethnicity"
+    names(VPKEnglish)[names(VPKEnglish)=="What.is.your.race..Select.all.that.apply."]="Race" 
+
+############################################################################################
+### VPK Spanish ############################################################################
+############################################################################################
+    
+#VPK Spanish
+#VPKSpanish=read.csv("VPK Families - Final - Spanish_December 8, 2023_15.07.csv", skip=1)[-1,]
+VPKSpanish=read.delim2("VPK Families - Final - Spanish_December 10, 2023_10.17.tsv", fileEncoding = "UCS-2LE",skip=1)[-1,]   
+VPKSpanish[VPKSpanish==""]=NA
+VPKSpanish=VPKSpanish[order(apply(VPKSpanish[,18:ncol(VPKSpanish)],1,function(c){sum(is.na(c))})),]
+    
+names(VPKSpanish)[grep("acepta.participar",names(VPKSpanish))]="Consent"
+
+names(VPKSpanish)[names(VPKSpanish)=="Nuestros.registros.muestran.que.usted.completó.una.aplicación.para.el.programa.VPK.de.Florida..pero.no.se.inscribió.en.el.programa...Es.esto.correcto."]="Screener"
+
+names(VPKSpanish)[names(VPKSpanish)=="X.Cuál.es.su.condado.de.residencia."]="CountyOfResidence"
+names(VPKSpanish)[names(VPKSpanish)=="X.Cuál.es.la.razón.principal.por.la.que.no.participó.en.el.programa.VPK."]="PrimaryReasonNotParticipate"
+names(VPKSpanish)[names(VPKSpanish)=="Si.ya.no.necesitaba.los.servicios.de.VPK.para.su.s..hijo.s..hija.s....por.qué.ya.no.los.necesitaba..Seleccione.todo.lo.que.corresponda."]="WhyNoLongerNeeded"
+names(VPKSpanish)[names(VPKSpanish)=="Si.tuvo.problemas.para.encontrar.un.proveedor...cuáles.fueron.las.razones..Seleccione.todo.lo.que.corresponda."]= "TroubleFindingChildcare"
+names(VPKSpanish)[names(VPKSpanish)=="X.Cuáles.son.las.características.más.importantes.que.desea.en.un.proveedor.de.VPK.....Clasifique.las.siguientes.opciones.desde.la.más.importante..1..hasta.la.menos.importante..6..arrastrando.y.soltando.las.opciones.de.respuesta.en.el.orden.de.importancia.para.usted....Precio"]="ImportantCharacteristicsPrice"
+names(VPKSpanish)[names(VPKSpanish)=="X.Cuáles.son.las.características.más.importantes.que.desea.en.un.proveedor.de.VPK.....Clasifique.las.siguientes.opciones.desde.la.más.importante..1..hasta.la.menos.importante..6..arrastrando.y.soltando.las.opciones.de.respuesta.en.el.orden.de.importancia.para.usted....Ubicación"]="ImportantCharacteristicsLocation"
+names(VPKSpanish)[names(VPKSpanish)=="X.Cuáles.son.las.características.más.importantes.que.desea.en.un.proveedor.de.VPK.....Clasifique.las.siguientes.opciones.desde.la.más.importante..1..hasta.la.menos.importante..6..arrastrando.y.soltando.las.opciones.de.respuesta.en.el.orden.de.importancia.para.usted....Calidad"]="ImportantCharacteristicsQuality"
+names(VPKSpanish)[names(VPKSpanish)=="X.Cuáles.son.las.características.más.importantes.que.desea.en.un.proveedor.de.VPK.....Clasifique.las.siguientes.opciones.desde.la.más.importante..1..hasta.la.menos.importante..6..arrastrando.y.soltando.las.opciones.de.respuesta.en.el.orden.de.importancia.para.usted....Horas.de.operación"]="ImportantCharacteristicsHours"
+names(VPKSpanish)[names(VPKSpanish)=="X.Cuáles.son.las.características.más.importantes.que.desea.en.un.proveedor.de.VPK.....Clasifique.las.siguientes.opciones.desde.la.más.importante..1..hasta.la.menos.importante..6..arrastrando.y.soltando.las.opciones.de.respuesta.en.el.orden.de.importancia.para.usted....Calificaciones.de.los.profesores"]="ImportantCharacteristicsTeacherQualif"
+names(VPKSpanish)[names(VPKSpanish)=="X.Cuáles.son.las.características.más.importantes.que.desea.en.un.proveedor.de.VPK.....Clasifique.las.siguientes.opciones.desde.la.más.importante..1..hasta.la.menos.importante..6..arrastrando.y.soltando.las.opciones.de.respuesta.en.el.orden.de.importancia.para.usted....Idioma.preferido"]="ImportantCharacteristicsLanguage"
+names(VPKSpanish)[names(VPKSpanish)=="Cuántos.hijos.hijas.tiene.que.ingresar.en.el.jardín.de.infantes..Kindergarten..este.próximo.año."]= "NumChildrenEnteringKG"
+names(VPKSpanish)[names(VPKSpanish)=="X.Cuánto.está.dispuesto.a.a.gastar.en.pre.o.post.atención..servicios.integrales..por.semana.para.su.s...QID9.ChoiceGroup.SelectedChoices..que.necesita.n..servicios."]="WillingToSpend"
+names(VPKSpanish)[names(VPKSpanish)=="Estaba.buscando.un.proveedor.de.VPK.más.cercano.a..."]="PreferredProviderCloseTo"
+names(VPKSpanish)[names(VPKSpanish)=="X.Cuál.es.su.método.principal.de.transporte."]= "PrimaryTransportationMode"
+names(VPKSpanish)[names(VPKSpanish)=="X.A.qué.distancia.de..QID11.ChoiceGroup.SelectedChoices..le.gustaría.que.estuviera.ubicado.su.proveedor.de.VPK."]="PreferredTravelDistance"
+names(VPKSpanish)[names(VPKSpanish)=="El.proveedor.abre.a.las.....AM."]="ProviderOpensAM"
+names(VPKSpanish)[names(VPKSpanish)=="El.proveedor.cierra.a.las.....PM."]="ProviderClosesPM"
+names(VPKSpanish)[names(VPKSpanish)=="X.Cuál.es.el.tamaño.de.su.hogar..Incluido.usted..todos.los.niños.y.todos.los.adultos.que.viven.actualmente.en.su.hogar."]="HouseHoldSize"
+names(VPKSpanish)[names(VPKSpanish)=="X.Cuál.es.tu.estado.civil."]="MaritalStatus"
+names(VPKSpanish)[names(VPKSpanish)=="Seleccione.el.idioma.que.habla.con.más.frecuencia.en.casa."]="HomeLanguage"
+names(VPKSpanish)[names(VPKSpanish)=="X.Que.tan.bien.hablas.inglés."]="EnglishProficiency"
+
+names(VPKSpanish)[names(VPKSpanish)=="X.Cuál.de.las.siguientes.categorías.cree.que.describe.mejor.el.ingreso.total.de.su.hogar.el.año.pasado..sueldos.y.salarios.de.todos.los.trabajos.."]="HouseHoldIncome"
+names(VPKSpanish)[names(VPKSpanish)=="X.Cúal.es.el.mayor.grado.o.nivel.escolar.que.usted.ha.completado."]="Education"
+names(VPKSpanish)[names(VPKSpanish)=="X.Cuál.es.su.situación.laboral.actual."]="Employment"
+names(VPKSpanish)[names(VPKSpanish)=="X.Estás.actualmente.inscrito.a.en.una.escuela.o.en.un.programa.de.entrenamiento.técnico.o.profesional."]="EnrolledEducation"
+names(VPKSpanish)[names(VPKSpanish)=="X.Cuál.es.su.etnia."]="Ethnicity"
+names(VPKSpanish)[names(VPKSpanish)=="X.Cuál.es.su.raza..Seleccione.todo.lo.que.corresponda." ]="Race"
+
+```
+
+
+```{r DataMerge}
+
+data=list(
+  "SRCombined"=do.call(rbind, list(SREnglish,SRSpanish)),
+  "VPKCombined"=do.call(rbind, list(VPKEnglish,VPKSpanish)))
+
+
+#Dedup by IPs and by LongLatitude
+#make a table of number of dedups found/removed
+sapply(list("SREnglish"=SREnglish, "SRSpanish"=SRSpanish, "VPKEnglish"=VPKEnglish, "VPKSpanish"=VPKSpanish, "SRCombined"=do.call(rbind, list(SREnglish,SRSpanish)),"VPKCombined"=do.call(rbind, list(VPKEnglish,VPKSpanish))),
+  simplify = FALSE, USE.NAMES = TRUE, function(d){
+rbind(
+"Didn't Consent"=table(factor((d$Consent!="I agree to participate." & d$Consent!="Acepto participar."), levels=c(T,F))),
+"Failed Screener"=table(factor((d$Screener!="Yes" & d$Screener!="Sí"), levels=c(T,F))),
+"Survey Incomplete"=table(factor((d$Finished!="True"), levels=c(T,F))),
+"Dup IP"=table(factor((duplicated(d$IP.Address)), levels=c(T,F)))#,
+# "Dup Location"=table(factor((duplicated(d$Location.Latitude)&duplicated(d$Location.Longitude)), levels=c(T,F))),
+# "Any Dup"=table(factor((duplicated(d$IP.Address)&(d$Finished=="False")|
+# (duplicated(d$Location.Latitude)&duplicated(d$Location.Longitude))), levels=c(T,F)))
+)})
+
+
+
+```
+
+## DeDuplication. 
+```{r DeDuplication}
+
+data$SRCombined=data$SRCombined[!(duplicated(data$SRCombined$IP.Address)&(data$SRCombined$Finished=="False")
+ #|(duplicated(data$SRCombined$Location.Latitude)&duplicated(data$SRCombined$Location.Longitude))
+ ),]
+
+data$VPKCombined=data$VPKCombined[!(duplicated(data$VPKCombined$IP.Address)&(data$VPKCombined$Finished=="False")                                   #|(duplicated(data$VPKCombined$Location.Latitude)&duplicated(data$VPKCombined$Location.Longitude))
+                                    ),]
+
+```
+
+
+## Remy's Table 1
+```{r Table1}
+
+Table1_VPK=t(sapply(c("Statewide",unique(c(data$VPKCombined$CountyOfResidence))),function(county){
+  if(county!="Statewide"|is.na(county)){
+    if(is.na(county)){
+      VPK=data$VPKCombined[is.na(data$VPKCombined$CountyOfResidence),]}
+    else{
+    VPK=data$VPKCombined[which(data$VPKCombined$CountyOfResidence==county),]}}
+  else{VPK=data$VPKCombined}
+  
+  
+  c(#"County"=county,
+    "Consented_Yes"=sum(c(VPK$Consent) %in% c("I agree to participate.","Acepto participar."),na.rm = TRUE),
+    "Consented_No"=sum(!(c(VPK$Consent) %in% c("I agree to participate.","Acepto participar.")),na.rm = TRUE),
+    "Consented_Yes_Screened_Yes"=sum(
+      c(VPK$Consent) %in% c("I agree to participate.","Acepto participar.") &
+        (c(VPK$Screener) %in% c("Yes","Sí")),na.rm = TRUE),
+    "Consented_Yes_Screened_No"=sum(
+      c(VPK$Consent) %in% c("I agree to participate.","Acepto participar.") &
+        !(c(VPK$Screener) %in% c("Yes","Sí")),na.rm = TRUE),
+    "Consented_Yes_Screened_Yes_Finished_Yes"=sum(
+      c(VPK$Consent) %in% c("I agree to participate.","Acepto participar.") &
+        (c(VPK$Screener) %in% c("Yes","Sí")) & 
+          (c(VPK$Finished)=="True"),na.rm = TRUE),
+    "Consented_Yes_Screened_Yes_Finished_No"=sum(
+      c(VPK$Consent) %in% c("I agree to participate.","Acepto participar.") &
+        (c(VPK$Screener) %in% c("Yes","Sí")) & 
+          !(c(VPK$Finished)=="True"),na.rm = TRUE))
+}))
+
+write.csv(Table1_VPK,"Table1_VPK.csv")
+
+#################################################################################################################################
+
+Table1_SR=t(sapply(c("Statewide",unique(c(data$SRCombined$CountyOfResidence))),function(county){
+  if(county!="Statewide"|is.na(county)){
+    if(is.na(county)){
+      SR=data$SRCombined[is.na(data$SRCombined$CountyOfResidence),]}
+    else{
+    SR=data$SRCombined[which(data$SRCombined$CountyOfResidence==county),]}}
+  else{SR=data$SRCombined}
+  
+  
+  c(#"County"=county,
+    "Consented_Yes"=sum(c(SR$Consent) %in% c("I agree to participate.","Acepto participar."),na.rm = TRUE),
+    "Consented_No"=sum(!(c(SR$Consent) %in% c("I agree to participate.","Acepto participar.")),na.rm = TRUE),
+    "Consented_Yes_Screened_Yes"=sum(
+      c(SR$Consent) %in% c("I agree to participate.","Acepto participar.") &
+        (c(SR$Screener) %in% c("Yes","Sí")),na.rm = TRUE),
+    "Consented_Yes_Screened_No"=sum(
+      c(SR$Consent) %in% c("I agree to participate.","Acepto participar.") &
+        !(c(SR$Screener) %in% c("Yes","Sí")),na.rm = TRUE),
+    "Consented_Yes_Screened_Yes_Finished_Yes"=sum(
+      c(SR$Consent) %in% c("I agree to participate.","Acepto participar.") &
+        (c(SR$Screener) %in% c("Yes","Sí")) & 
+          (c(SR$Finished)=="True"),na.rm = TRUE),
+    "Consented_Yes_Screened_Yes_Finished_No"=sum(
+      c(SR$Consent) %in% c("I agree to participate.","Acepto participar.") &
+        (c(SR$Screener) %in% c("Yes","Sí")) & 
+          !(c(SR$Finished)=="True"),na.rm = TRUE))
+}))
+
+write.csv(Table1_SR,"Table1_SR.csv")
+
+```
+
+
+## Trim Data to include those who are Consented and Screened. 
+```{r DataTrim}
+
+# SREnglish=SREnglish[(SREnglish$Consent=="I agree to participate." & SREnglish$Screener=="Yes"),]
+# SRSpanish=SRSpanish[SRSpanish$Consent=="Acepto participar." & SRSpanish$Screener=="Sí",]
+# VPKEnglish=VPKEnglish[(VPKEnglish$Consent=="I agree to participate." & VPKEnglish$Screener=="Yes"),]
+# VPKSpanish=VPKSpanish[(VPKSpanish$Consent=="Acepto participar." & VPKSpanish$Screener=="Sí"),]
+
+#```
+
+
+data$SRCombined=data$SRCombined[(data$SRCombined$Consent %in% c("I agree to participate.","Acepto participar.") & data$SRCombined$Screener %in% c("Yes","Sí")),]
+
+
+data$VPKCombined=data$VPKCombined[(data$VPKCombined$Consent %in% c("I agree to participate.","Acepto participar.") & data$VPKCombined$Screener %in% c("Yes","Sí")),]
+
+
+sapply(data,
+  simplify = FALSE, USE.NAMES = TRUE, function(d){
+rbind(
+"Didn't Consent"=table(factor((d$Consent!="I agree to participate." & d$Consent!="Acepto participar."), levels=c(T,F))),
+"Failed Screener"=table(factor((d$Screener!="Yes" & d$Screener!="Sí"), levels=c(T,F))),
+"Survey Incomplete"=table(factor((d$Finished!="True"), levels=c(T,F))),
+"Dup IP"=table(factor((duplicated(d$IP.Address)), levels=c(T,F)))#,
+# "Dup Location"=table(factor((duplicated(d$Location.Latitude)&duplicated(d$Location.Longitude)), levels=c(T,F))),
+# "Any Dup"=table(factor((duplicated(d$IP.Address)&(d$Finished=="False")|
+# (duplicated(d$Location.Latitude)&duplicated(d$Location.Longitude))), levels=c(T,F)))
+)})
+
+
+```
+
+# Recoding Time Variable
+```{r RecodingTime}
+
+#Provider opening/closing time recoding
+
+dataSRCombinedProviderClosesPM=data$SRCombined$ProviderClosesPM
+dataSRCombinedProviderOpensAM=data$SRCombined$ProviderOpensAM
+
+dataVPKCombinedProviderClosesPM=data$VPKCombined$ProviderClosesPM
+dataVPKCombinedProviderOpensAM=data$VPKCombined$ProviderOpensAM
+
+
+for(d in c("SRCombined","VPKCombined")){
+for(var in c("ProviderOpensAM","ProviderClosesPM")){
+
+# remove leading zeroes 
+data[[d]][,var]=gsub("^0","",data[[d]][,var])
+
+# remove leading spaces 
+data[[d]][,var]=gsub("^\\s+","",data[[d]][,var])
+
+# remove trailing spaces 
+data[[d]][,var]=gsub("\\s+$","",data[[d]][,var])
+
+# remove "hours" 
+data[[d]][,var]=gsub("hours","",data[[d]][,var])
+
+# swap "." for ":"  
+data[[d]][,var]=gsub("\\.",":",data[[d]][,var])
+
+# swap ";" for ":"  
+data[[d]][,var]=gsub("\\;",":",data[[d]][,var])
+
+# swap ":AM" for ":00"  
+data[[d]][,var]=gsub("\\:AM",":00",data[[d]][,var])
+
+# swap ":PM" for ":00"  
+data[[d]][,var]=gsub("\\:PM",":00",data[[d]][,var])
+
+# swap " PM" for ""  
+data[[d]][,var]=gsub("\\spm$","",data[[d]][,var])
+
+# swap ":99" for ""  
+data[[d]][,var]=gsub("\\:99","\\:00",data[[d]][,var])
+
+# adjust from 24h->12h
+data[[d]][,var][grep("^1[3-9]",data[[d]][,var])]=paste0(as.numeric(substr(data[[d]][,var][grep("^1[3-9]",data[[d]][,var])],1,2))-12,substring(data[[d]][,var][grep("^1[3-9]",data[[d]][,var])],3))
+
+# first numeric only
+data[[d]][,var][grep("^[1-9]$|^[1-9]-|^[1-9]/|^[1-9]\\s+",data[[d]][,var])]=paste0(substr(data[[d]][,var][grep("^[1-9]$|^[1-9]-|^[1-9]/",data[[d]][,var])],1,1),":00")
+
+# two numeric only
+data[[d]][,var][grep("^[1-9][0-9]$|^[1-9][0-9]-",data[[d]][,var])]=paste0(substr(data[[d]][,var][grep("^[1-9][0-9]$|^[1-9][0-9]-",data[[d]][,var])],1,2),":00")
+
+# first numeric if followed by alpha, trim
+data[[d]][,var][grep("^[0-9][[:alpha:]]|^[0-9]\\s[[:alpha:]]",data[[d]][,var])]=paste0(substr(data[[d]][,var][grep("^[0-9][[:alpha:]]|^[0-9]\\s[[:alpha:]]",data[[d]][,var])],1,1),":00")
+
+# first numeric if followed by alpha, trim
+data[[d]][,var][grep("^[1-9][0-9][[:alpha:]]+|^[1-9][0-9]\\s[[:alpha:]]+",data[[d]][,var])]=paste0(substr(data[[d]][,var][grep("^[1-9][0-9][[:alpha:]]+|^[1-9][0-9]\\s[[:alpha:]]+",data[[d]][,var])],1,2),":00")
+
+# first numeric if followed by alpha, trim
+data[[d]][,var][grep("^[1-9][0-9][[:alpha:]]|^[1-9][0-9]\\s[[:alpha:]]",data[[d]][,var])]=paste0(substr(data[[d]][,var][grep("^[1-9][0-9][[:alpha:]]|^[1-9][0-9]\\s[[:alpha:]]",data[[d]][,var])],1,2),":00")
+
+
+# if numeric not followed by : then two numerics
+data[[d]][,var][grep("^[1-9]:[0-9][0-9]*",data[[d]][,var])]=substr(data[[d]][,var][grep("^[1-9]:[0-9][0-9]*",data[[d]][,var])],1,4)
+
+# if only alpha (non-numeric)
+data[[d]][,var][grep("^[[:alpha:]]+$",data[[d]][,var])]=NA
+
+#if numeric & another numeric
+data[[d]][,var][grep("^[1-9][0-9][0-9]",data[[d]][,var])]=paste0(substr(data[[d]][,var][grep("^[1-9][0-9][0-9]",data[[d]][,var])],1,1),":",substr(data[[d]][,var][grep("^[1-9][0-9][0-9]",data[[d]][,var])],2,3))
+
+
+# first numeric only
+ data[[d]][,var][grep("^[[:digit:]]+",data[[d]][,var], invert=TRUE)]=NA
+
+}}
+
+  
+# unique(data$SRCombined$ProviderClosesPM)
+# unique(data$SRCombined$ProviderOpensAM)
+
+# unique(data$VPKCombined$ProviderClosesPM)
+# unique(data$VPKCombined$ProviderOpensAM)
+
+# View(cbind(dataSRCombinedProviderClosesPM, data$SRCombined$ProviderClosesPM))
+# View(cbind(dataSRCombinedProviderOpensAM, data$SRCombined$ProviderOpensAM))
+# 
+# View(cbind(dataVPKCombinedProviderClosesPM, data$VPKCombined$ProviderClosesPM))
+# View(cbind(dataVPKCombinedProviderOpensAM, data$VPKCombined$ProviderOpensAM))
+
+ 
+```
+
+
+## Recoding Response Options
+
+```{r RecodingRespOpts}
+
+for(var in unique(names(SRSpanish),names(VPKSpanish))){
+  if(var %in% names(SRSpanish)){
+    SRSpanish[,var] %in% SRSpanish[,var]
+    
+  }
+  
+  if(var %in% names(VPKSpanish)){
+    
+    
+  }
+  
+
+}
+
+
+#consent
+data=lapply(data, function(d){
+  print(dim(d))
+  print(class(d))
+d[d=="Acepto participar."]="I agree to participate."  
+
+d[d=="Sí"]="Yes"
+
+d[d=="Mis circunstancias cambiaron y ya no necesitaba los servicios."]="My circumstances changed, and I no longer needed services."  
+
+d[d=="Tuve problemas para encontrar un proveedor que satisficiera mis necesidades."]="I had trouble finding a provider that met my needs."
+
+d[d=="Ya no era elegible para el programa de \"Florida School Readiness\" (subsidio de ELC)."]="I was no longer eligible for the Florida School Readiness program (ELC voucher/subsidy)." 
+
+d[d=="Encontré familiares/amigos que me ayudaron con el cuidado de los niños."]="I found family/friends to help with childcare."
+
+d[d=="Los proveedores disponibles eran demasiado caros.\n"]= "Available providers were too expensive."
+
+d[d=="5 o más niños"]="5 or more children"
+
+d[grep("[2-9] niños",d)]=gsub("niños","children",unlist(d[grep("[2-9] niños",d)]))
+
+d[grep("1 niño",d)]=gsub("niño","child ",unlist(d[grep("1 niño",d)]))
+
+d[grep("Menos de 1 año",d)]=gsub("Menos de 1 año","Less than 1 year-old",unlist(d[grep("Menos de 1 año",d)]))
+
+d[grep("6 años o más",d)]=gsub("6 años o más","6-years-old or older  ",unlist(d[grep("6 años o más",d)]))
+
+d[grep("[1-9] años",d)]=gsub(" años","-year-old ",unlist(d[grep("[1-9] años",d)]))
+
+d[d=="La escuela de mis otros hijos/hijas"]="My other children’s school  "
+
+d[d=="Casa"]="Home"
+
+d[d=="Trabajo"]="Work  "
+
+d[d=="Familiares"]="Relatives "
+
+d[d=="Otra ubicación"]="Other location "
+
+d[d=="Viaje compartido con amigos, familiares o compañeros de trabajo\n"]="Carpool with friends, family, or coworkers  "
+
+d[d=="Menos de 5 minutos"]="Less than 5 minutes"
+
+d[d=="Divorciados/Separados"]="Divorced/Separated "
+
+d[d=="Nada bien"]="Not well"
+
+d[d=="Bien"]="Well"
+
+d[grep("[0-9] a [1-9]",d)]=gsub(
+  " a "," to ",unlist(d[grep("[0-9] a [1-9]",d)]))
+
+d[d=="10 to 20 minutes  "]="10 to 20 minutes"
+
+d[d=="5 to 10 minutes  " ]="5 to 10 minutes"
+
+d[d=="Algunos créditos universitarios pero sin título"]= "Some college credit but no degree "
+
+d[d=="Octavo grado o menos"]= "8th grade or less "
+
+d[d=="Empleado/a tiempo completo"]= "Employed full-time "
+
+d[d=="Sí"]= "Yes"
+
+d[d=="Hispano o Latino"]= "Hispanic or Latino"
+
+d[d=="No Hispano ni Latino"]="Not Hispanic or Latino"
+
+d[d=="Blanco"]="White"
+
+d[d=="Negro o afroamericano"]="Black or African American"
+
+d[d=="Otro"]="Other"
+
+
+########
+d[d=="No tuve ningún problema."]="I did not experience any challenges."
+d[d=="Soltero/a" ]="Single"
+d[d=="Espanol"]="Spanish"
+d[d=="No Aplica"|d=="No Aplica."|d=="No aplica."]="Not applicable"  
+d[d=="Los proveedores disponibles eran demasiado caros.\n"]= 
+d[d=="Blanco"]="White"
+d[d=="Otro"]="Other"
+d[d=="No sé/Prefiero no responder"]="I don’t know/prefer not to respond"
+d[d=="Empleado/a tiempo parcial"]="Employed part-time " 
+d[d=="Tareas del hogar (sin pago)"]="Homemaking (not paid) "
+d[d=="Prefiero no decir"]="Prefer not to say "
+d[d=="Buscando oportunidades laborales"]="Seeking job opportunities "
+d[d=="Retirado/a"]="Retired "
+d[d=="Título asociado (AA, AS)"]="Associate degree (AA, AS) "
+d[d=="Título de posgrado o profesional"]= "Graduate or professional degree"
+d[d=="Algo de preparatoria (high school), pero no se graduó"]= "9th-12th grade (no high school diploma) "
+d[d=="Graduado/a de preparatoria o GED"]="High school graduate or GED completed "
+d[d=="Título bachiller (BA, BS, AB)"]="Bachelor’s degree (BA, BS, AB) "
+d[d=="Prefiero no contestar"]="Prefer not to answer "   
+d[d=="Menos de $14,000"]="Less than $14,000 "
+d[d=="$100,000 o más"]="$100,000 or more "
+d[d=="Más de $150"]="Greater than $150  "
+d[d=="No muy bien"]="Not well"
+d[d=="Muy bien"]="Very well"
+d[d=="Español"]="Spanish"
+d[d=="Inglés"]="English " 
+d[d=="Criollo haitiano"]="Haitian Creole "
+d[d=="Portugués"]="Spanish "
+d[d=="Casado/a"]="Married"
+d[d=="Pareja, no casado/a"]="Living with partner in same household "
+d[d=="5 to 10 minutos"]="5 to 10 minutes"
+d[d=="10 to 20 minutos"]="10 to 20 minutes"
+d[d=="20 to 30 minutos"]="20 to 30 minutes"
+d[d=="Vehículo motorizado personal\n"]="Personal motor vehicle "
+d[d=="Viaje compartido pagado (por ejemplo: Uber, Lyft, etc.)\n"]="Paid rideshare (for example: Uber, Lyft, etc.) "
+d[d=="Autobús o otro transporte público"]="Bus or other public transportation "
+d[d=="Caminar"]="Walking "                                                                          
+d[d=="Bicicleta"]="Bicycle"
+d[d=="Decidí quedarme en casa con mi hijo."]="I decided to stay home with my child."
+d[d=="Decidí que mi hijo se quedara con familiares/amigos."]="I decided to have my child stay with family/friends."
+d[d=="Encontré arreglos alternativos de educación preescolar sin usar VPK."]="I found alternative Pre-K arrangements without using VPK."
+d[d=="Me mudé."]="I moved."
+d[d=="Quería inscribir a mi hijo en un nuevo proveedor que no participaba en VPK."]="I wanted to enroll my child at a new provider who did not participate in VPK."
+d[d=="Tengo la intención de inscribirme más tarde."]="I intend to enroll later."
+d[d=="Quería atención de día completo y no podía pagar el resto del día."]="I wanted full-day care and could not afford to pay for the rest of the day."
+d[d=="Quería quedarme con mi proveedor actual y ellos no participan en VPK."]="I wanted to stay at my current provider, and they did not participate in VPK."
+d[d=="Quería quedarme con mi proveedor actual y ellos no participan en el programa de “Florida School Readiness” (subsidio de ELC)."]="I wanted to stay at my current childcare provider who did not participate in the Florida School Readiness program (ELC voucher/subsidy)."
+d[d=="Tuve problemas para encontrar un proveedor de VPK que satisficiera mis necesidades." ]="I had trouble finding a VPK provider that met my needs."
+
+
+d
+})
+
+```
+
+
+
+## Multiresponse parsing. 
+### VPK
+```{r VPKparsingmultiresp}
+
+# VPK
+
+    # TroubleFindingChildcare
+    TroubleParse=t(sapply(data$VPKCombined$TroubleFindingChildcare, function(vec){
+        parse=unlist(strsplit(gsub("  ,|\n| ,|,","",vec),"\\."))
+        
+      out=c("Trbl_NoPubSchls"=0, "Trbl_NoPvtSchls"=0, "Trbl_Expnsv"=0, "Trbl_Location"=0, "Trbl_Other"=0, "Trbl_NoChlgns"=0, "Trbl_Quality"=0, "Trbl_NoFit"=0, "Trbl_Comfort"=0, "Trbl_NoHours"=0, "Trbl_Language"=0)
+          
+          if(any(parse %in% c("There were no public school providers available with open slots", "No había ningún proveedor de escuelas públicas disponible con espacios abiertos"))){out["Trbl_NoPubSchls"]=1}
+             
+        if(any(parse %in% c("There were no private school providers available with open slots","No había ningún proveedor de escuelas privadas disponible con espacios abiertos"))){out["Trbl_NoPvtSchls"]=1}
+           
+         if(any(parse %in% c("Available providers were too expensive", "Los proveedores disponibles eran demasiado caros"))){out["Trbl_Expnsv"]=1}
+            
+        if(any(parse %in% c("Available providers were not conveniently located", "Los proveedores disponibles no estaban convenientemente ubicados"))){out["Trbl_Location"]=1} 
+           
+        if(any(parse %in% c("Other", "Otro"))){out["Trbl_Other"]=1}                                                                          
+        if(any(parse %in% c("I did not experience any challenges"))){out["Trbl_NoChlgns"]=1}                                            
+        if(any(parse %in% c("Available providers were not high quality", "Los proveedores disponibles no eran de alta calidad"))){out["Trbl_Quality"]=1}
+        
+        if(any(parse %in% c("None of the available providers were a good fit for my needs", "Ninguno de los proveedores disponibles se adaptaba bien a mis necesidades"))){out["Trbl_NoFit"]=1}
+        
+        if(any(parse %in% c("I did not feel comfortable with any available providers", "No me sentí cómodo/a con ningún proveedor disponible"))){out["Trbl_Comfort"]=1}                      
+        
+        if(any(parse %in% c("Available providers were not open during the hours I needed","Los proveedores disponibles no estaban abiertos durante las horas que necesitaba"))){out["Trbl_NoHours"]=1} 
+        if(any(parse %in% c("Available providers did not speak my preferred language", "Los proveedores disponibles no hablaban mi idioma preferido"))){out["Trbl_Language"]=1}                     
+    out
+    }))
+    
+    
+    data$VPKCombined=data.frame(data$VPKCombined, TroubleParse)
+
+#WhyNoLongerNeeded
+
+    WhyNoLongerNeeded=t(sapply(data$VPKCombined$WhyNoLongerNeeded, function(vec){
+        parse=unlist(strsplit(gsub("  ,|\n| ,|,","",vec),"\\."))
+  
+      out=c("Why_NA"=0,"Why_Other"=0, "Why_Moved"=0, "Why_AlternCare"=0, "Why_StayHome"=0, "Why_StayFam"=0)
+
+          #if(any(parse %in% c("Not applicable","Not Applicable"))){out["Why_NA"]=1}
+          if(any(parse %in% c("Other","Otro"))){out["Why_Other"]=1}
+          if(any(parse %in% c("Me mudé","I moved"))){out["Why_Moved"]=1}
+          if(any(parse %in% c("I found alternative Pre-K arrangements without using VPK","Encontré arreglos alternativos de educación preescolar sin usar VPK"))){out["Why_AlternCare"]=1}
+          if(any(parse %in% c("Decidí quedarme en casa con mi hijo","I decided to stay home with my child"))){out["Why_StayHome"]=1}
+          if(any(parse %in% c("I decided to have my child stay with family/friends"))){out["Why_StayFam"]=1}
+
+      out}))    
+
+data$VPKCombined=data.frame(data$VPKCombined,WhyNoLongerNeeded)
+    
+    
+#Race
+
+    Race=t(sapply(data$VPKCombined$Race, function(vec){
+        parse=unlist(strsplit(vec,", |,"))
+  
+      out=c("Race_BAA"=0, "Race_White"=0, "Race_Other"=0, "Race_AIAN"=0, "Race_NoAnswer"=0, "Race_Asian"=0, "Race_NHPI"=0, "Race_Hisp"=0, "Race_NotHisp"=0)
+      
+      if(any(parse %in% c("Black or African American","Negro o afroamericano"))){out["Race_BAA"]=1}
+      if(any(parse %in% c("White","Blanco"))){out["Race_White"]=1}
+      if(any(parse %in% c("Other","Otro"))){out["Race_Other"]=1}
+      if(any(parse %in% c("American Indian or Alaska Native"))){out["Race_AIAN"]=1}
+      if(any(parse %in% c("Don't know/Prefer not to answer","I don’t know/prefer not to respond"))){out["Race_NoAnswer"]=1}
+      if(any(parse %in% c("Asian"))){out["Race_Asian"]=1}
+      if(any(parse %in% c("Native Hawaiian or Other Pacific Islander"))){out["Race_NHPI"]=1}
+      if(any(parse %in% c("Hispanic or Latino"))){out["Race_Hisp"]=1}
+      if(any(parse %in% c("Not Hispanic or Latino"))){out["Race_NotHisp"]=1}
+      out}))
+
+data$VPKCombined=data.frame(data$VPKCombined,Race)
+
+```
+
+
+### SR
+```{r SRparsingmultiresp}
+
+# SR
+
+    # TroubleFindingChildcare
+    TroubleParse=t(sapply(data$SRCombined$TroubleFindingChildcare, function(vec){
+        parse=unlist(strsplit(gsub("  ,|\n| ,|,","",vec),"\\."))
+        
+      out=c("Trbl_Openings"=0, "Trbl_Expnsv"=0, "Trbl_Location"=0, "Trbl_Other"=0, "Trbl_NoChlgns"=0, "Trbl_Quality"=0, "Trbl_NoFit"=0, "Trbl_Comfort"=0, "Trbl_NoHours"=0, "Trbl_Language"=0, "Trbl_FamFriends"=0, "Trbl_NotElgbl"=0 )
+          
+        if(any(parse %in% c("I could not find a provider with openings to serve my child/children"))){out["Trbl_Openings"]=1}
+        if(any(parse %in% c("Available providers were too expensive"))){out["Trbl_Expnsv"]=1}
+        if(any(parse %in% c("Available providers were not conveniently located"))){out["Trbl_Location"]=1} 
+        if(any(parse %in% c("Other", "Otro"))){out["Trbl_Other"]=1}                                                 
+        if(any(parse %in% c("I did not experience any challenges"))){out["Trbl_NoChlgns"]=1}                        
+        if(any(parse %in% c("Available providers were not high quality"))){out["Trbl_Quality"]=1}
+        if(any(parse %in% c( "None of the available providers were a good fit for my needs","Ninguno de los proveedores disponibles se adaptaba bien a mis necesidades"))){out["Trbl_NoFit"]=1}
+        if(any(parse %in% c("I did not feel comfortable with any available providers"))){out["Trbl_Comfort"]=1}
+        if(any(parse %in% c("Available providers were not open during the hours I needed"))){out["Trbl_NoHours"]=1} 
+        if(any(parse %in% c("Available providers did not speak my preferred language"))){out["Trbl_Language"]=1}
+        if(any(parse %in% c("I found family/friends to help with childcare"))){out["Trbl_FamFriends"]=1}
+        if(any(parse %in% c("Ya no era elegible para el programa de “Florida School Readiness” (subsidio de ELC)"))){out["Trbl_NotElgbl"]=1}
+      
+    out
+    }))
+    
+    data$SRCombined=data.frame(data$SRCombined, TroubleParse)
+
+#WhyNoLongerNeeded
+
+    WhyNoLongerNeeded=t(sapply(data$SRCombined$WhyNoLongerNeeded, function(vec){
+        parse=unlist(strsplit(gsub("  ,|\n| ,|,","",vec),"\\."))
+  
+      out=c("Why_NA"=0,"Why_Other"=0, "Why_Moved"=0, "Why_AlternCare"=0, "Why_StayHome"=0, "Why_StayFam"=0, "Why_NotElgbl"=0)
+
+          # if(any(parse %in% c("Not applicable","Not Applicable"))){out["Why_NA"]=1}
+          if(any(parse %in% c("Other"))){out["Why_Other"]=1}
+          if(any(parse %in% c("Me mudé","I moved"))){out["Why_Moved"]=1}
+          if(any(parse %in% c("I found alternative care arrangements without using the Florida School Readiness program  (ELC voucher/subsidy)"))){out["Why_AlternCare"]=1}
+          if(any(parse %in% c("Decidí quedarme en casa con mi hijo","I decided to stay home with my child"))){out["Why_StayHome"]=1}
+          if(any(parse %in% c("I decided to stay home with my child"))){out["Why_StayHome"]=1}
+          if(any(parse %in% c("I found family/friends to help with childcare"))){out["Why_StayFam"]=1}          
+          if(any(parse %in% c("I was no longer eligible for the Florida School Readiness program (ELC voucher/subsidy)","Ya no era elegible para el programa de “Florida School Readiness” (subsidio de ELC)"))){out["Why_NotElgbl"]=1} 
+      
+
+      out}))    
+
+data$SRCombined=data.frame(data$SRCombined,WhyNoLongerNeeded)
+    
+    
+#Ages of Children Needing Care
+
+    Ages=t(sapply(data$SRCombined$AgeUnableToFindOpenings , function(vec){
+        parse=unlist(strsplit(vec,", |,"))
+
+    out=c("CareAges_Sub1"=0, "CareAges_1"=0, "CareAges_2"=0, "CareAges_3"=0, "CareAges_4"=0, "CareAges_5"=0, "CareAges_6"=0, "CareAges_NA"=0)
+        
+        
+      if(any(parse %in% c("Less than 1 year-old"))){out["CareAges_Sub1"]=1}
+      if(any(parse %in% c("1-year-old "))){out["CareAges_1"]=1}
+      if(any(parse %in% c("2-year-old "))){out["CareAges_2"]=1}
+      if(any(parse %in% c("3-year-old "))){out["CareAges_3"]=1}    
+      if(any(parse %in% c("4-year-old "))){out["CareAges_4"]=1}
+      if(any(parse %in% c("5-year-old "))){out["CareAges_5"]=1}
+      if(any(parse %in% c("6-years-old or older  "))){out["CareAges_6"]=1}                           
+      # if(any(parse %in% c("Not Applicable","Not applicable"))){out["CareAges_NA"]=1}
+        
+      out}))
+
+data$SRCombined=data.frame(data$SRCombined,Ages)
+
+#Race
+
+    Race=t(sapply(data$SRCombined$Race, function(vec){
+        parse=unlist(strsplit(vec,", |,"))
+  
+      out=c("Race_BAA"=0, "Race_White"=0, "Race_Other"=0, "Race_AIAN"=0, "Race_NoAnswer"=0, "Race_Asian"=0, "Race_NHPI"=0, "Race_Hisp"=0, "Race_NotHisp"=0)
+      
+      if(any(parse %in% c("Black or African American"))){out["Race_BAA"]=1}
+      if(any(parse %in% c("White"))){out["Race_White"]=1}
+      if(any(parse %in% c("Other"))){out["Race_Other"]=1}
+      if(any(parse %in% c("American Indian or Alaska Native"))){out["Race_AIAN"]=1}
+      if(any(parse %in% c("Don't know/Prefer not to answer","I don’t know/prefer not to respond","Prefer not to answer"))){out["Race_NoAnswer"]=1}
+      if(any(parse %in% c("Asian"))){out["Race_Asian"]=1}
+      if(any(parse %in% c("Native Hawaiian or Other Pacific Islander"))){out["Race_NHPI"]=1}
+      if(any(parse %in% c("Hispanic or Latino"))){out["Race_Hisp"]=1}
+      if(any(parse %in% c("Not Hispanic or Latino"))){out["Race_NotHisp"]=1}
+      out}))
+
+data$SRCombined=data.frame(data$SRCombined,Race)
+
+```
+
+## Final trim. 
+### Remove trailing spaces and empty characters
+
+```{r finaltrim}
+
+data$SRCombined=as.data.frame(apply(data$SRCombined, 2, function(x){gsub('\\s+$','',x)}))
+unique(unlist(data$SRCombined[,18:ncol(data$SRCombined)]))
+
+data$VPKCombined=as.data.frame(apply(data$VPKCombined, 2, function(x){gsub('\\s+$','',x)}))
+unique(unlist(data$VPKCombined[,18:ncol(data$VPKCombined)]))
+
+#also recode empty character vectors as NA 
+data$SRCombined[data$SRCombined==""]=NA
+data$VPKCombined[data$VPKCombined==""]=NA
+
+
+
+```
+
+## Cross tabs. 
+
+### General Tables and Plots. 
+
+
+```{r PlotsTables, echo=FALSE}
+PlotTabulate=function(var, data, subpath=""){
+  sapply(names(data), simplify=FALSE, USE.NAMES = TRUE, function(d){
+    # print(paste0(subpath,d,"_",var,".png"))
+    # print(var %in% names(data[[d]]))
+     if(var %in% names(data[[d]])){
+      t=table(data[[d]][,var], useNA="no")
+      tp=prop.table(t)
+      write.csv(rbind("Freq"=t,"Prop"=tp),paste0(subpath,d,"_",var,"_table.csv"))
+      png(paste0(subpath,d,"_",var,".png"))
+      #names(t)[is.na(names(t))]="Missing/NA"
+      for(name in which(nchar(names(t))>20)){
+        loc=unlist(gregexpr("\\s",names(t)[name]))[unlist(gregexpr("\\s",names(t)[name]))>12][1]
+        substr(names(t)[name], loc, loc) <- "\n"}
+      
+      #par(mar = c(bottom, left, top, right))
+        par(mar = c(12.1, 4.1, 4.1, 2.1))
+        par(las=2)
+        b=barplot(t, ylim=c(0,max(t)*1.2))
+        text(b, t + max(t)*0.1, t)
+      dev.off()
+
+      out=list("plot"=b,"freqtable"=t,"proptable"=tp)
+       }
+     else{out=list(NA)}
+  })
+}
+
+```
+
+
+```{r GeneralTablesandPlots}
+
+for(var in unique(names(data$SRCombined)[18:ncol(data$SRCombined)],names(data$VPKCombined)[18:ncol(data$VPKCombined)] )){PlotTabulate(var,data,subpath="/Users/chapm564/Documents/GitHub/VPK_SR_Survey/GeneralPlotsTables/" )}
+
+```
+
+### SR. 
+
+```{r SRCrosstabs}
+
+# Preferred distance by mode of transportation
+# ^Split by people who did/didnt endorse pref for ‘conveniently located’
+      write.csv(table(
+        data$SRCombined$PrimaryTransportationMode[
+          grep("*conveniently located*",data$SRCombined$TroubleFindingChildcare, invert=FALSE)], 
+        data$SRCombined$PreferredTravelDistance[
+          grep("*conveniently located*",data$SRCombined$TroubleFindingChildcare, invert=FALSE)])
+        , "SR_xtabs_PrefDistbyTranspMode_NotConvLocTRUE.csv")  
+
+      write.csv(table(
+        data$SRCombined$PrimaryTransportationMode[
+          !grepl("*conveniently located*",data$SRCombined$TroubleFindingChildcare)], 
+        data$SRCombined$PreferredTravelDistance[
+          !grepl("*conveniently located*",data$SRCombined$TroubleFindingChildcare)]),
+         "SR_xtabs_PrefDistbyTranspMode_NotConvLocFALSE.csv")
+
+# Provider quality with parent education  
+write.csv(table(data$SRCombined$Education, "Provider Not High Quality"=grepl("*quality*",data$SRCombined$TroubleFindingChildcare)),"SR_xtabs_EducationbyProviderNotQuality.csv")
+
+# "Provider not open during hours I need" vs Ranges for open/closed preferences
+table("Provider Not Open Hours I need"=grepl("*hours*",data$SRCombined$TroubleFindingChildcare),
+"Preferred Hours Outside 7a-6p"=(data$SRCombined$ProviderOpensAM<"7:00"|data$SRCombined$ProviderClosesPM>"6:00"))
+write.csv(
+table("Opens AM"=data$SRCombined$ProviderOpensAM[grep("*hours*",data$SRCombined$TroubleFindingChildcare)],
+      "Closes PM"=data$SRCombined$ProviderClosesPM[grep("*hours*",data$SRCombined$TroubleFindingChildcare)]),
+"SRxtabs_PrefHoursbyProvNotOpenHours.csv")
+
+write.csv(
+table("Opens AM"=data$SRCombined$ProviderOpensAM[grep("*hours*",data$SRCombined$TroubleFindingChildcare, invert=TRUE)],
+      "Closes PM"=data$SRCombined$ProviderClosesPM[grep("*hours*",data$SRCombined$TroubleFindingChildcare, invert=TRUE)]),
+"SRxtabs_PrefHoursbyProvOpenHours.csv")
+
+
+# Ranges for open/closed preferences <- general for everyone 
+write.csv(
+table("Opens AM"=data$SRCombined$ProviderOpensAM,
+      "Closes PM"=data$SRCombined$ProviderClosesPM),
+"SRxtabs_PrefHours.csv")
+
+
+```
+
+### VPK. 
+```{r VPKCrosstabs}
+
+    # No longer needed care
+    # Section 1: Sent kids to stay with family/friends
+    #     Household Size distribution
+    #     Income distribution 
+    #     marital status frequencies
+    #     what responses do they select for reasons having trouble finding a provider
+
+Sect1Indx=grep("*I decided to have my child stay with family/friends*",data$VPKCombined$WhyNoLongerNeeded)
+
+    PlotTabulate("HouseHoldSize", list("VPK_Child Staying with FamilyFriends"=data$VPKCombined[Sect1Indx,]))
+    PlotTabulate("HouseHoldIncome", list("VPK_Child Staying with FamilyFriends"=data$VPKCombined[Sect1Indx,]))
+    PlotTabulate("MaritalStatus", list("VPK_Child Staying with FamilyFriends"=data$VPKCombined[Sect1Indx,]))
+    png("FamFriends_Trouble.png")
+    par(mar = c(10.1, 4.1, 4.1, 2.1))
+    par(las=2)
+    barplot(apply(data$SRCombined[Sect1Indx,grep("^Trbl",names(data$SRCombined))], 2, function(c){sum(as.numeric(c),na.rm=TRUE)})) 
+    dev.off()
+    # Section 2: Stay at home with child 
+    #     Household Size distribution
+    #     Income distribution 
+    #     marital status frequencies
+    #     what responses do they select for reasons having trouble finding a provider
+    
+Sect2Indx=grep("*I decided to stay home with my child*",data$VPKCombined$WhyNoLongerNeeded)
+
+    PlotTabulate("HouseHoldSize", list("VPK_Child Staying Home"=data$VPKCombined[Sect2Indx,]))
+    PlotTabulate("HouseHoldIncome", list("VPK_Child Staying Home"=data$VPKCombined[Sect2Indx,]))
+    PlotTabulate("MaritalStatus", list("VPK_Child Staying Home"=data$VPKCombined[Sect2Indx,]))
+    png("StayHome_Trouble.png")
+    par(mar = c(10.1, 4.1, 4.1, 2.1))
+    par(las=2)
+    barplot(apply(data$SRCombined[Sect2Indx,grep("^Trbl",names(data$SRCombined))], 2, function(c){sum(as.numeric(c),na.rm=TRUE)})) 
+    dev.off()
+    # Section 3: Alternative care
+    #     Household Size distribution
+    #     Income distribution 
+    #     marital status frequencies
+    #     what responses do they select for reasons having trouble finding a provider
+
+Sect3Indx=grep("*I found alternative Pre-K arrangements without using VPK*",data$VPKCombined$WhyNoLongerNeeded)
+    PlotTabulate("HouseHoldSize", list("VPK_Child VPK Alternative"=data$VPKCombined[Sect3Indx,]))
+    PlotTabulate("HouseHoldIncome", list("VPK_Child VPK Alternative"=data$VPKCombined[Sect3Indx,]))
+    PlotTabulate("MaritalStatus", list("VPK_Child VPK Alternative"=data$VPKCombined[Sect3Indx,]))
+    png("AlternateArrg_Trouble.png")
+    par(mar = c(10.1, 4.1, 4.1, 2.1))
+    par(las=2)
+    barplot(apply(data$SRCombined[Sect3Indx,grep("^Trbl",names(data$SRCombined))], 2, function(c){sum(as.numeric(c),na.rm=TRUE)}))
+    dev.off()
+```
+
+# Export data. 
+```{r ExportData}
+write.csv(data$VPKCombined,"VPK_12-11.csv")
+write.csv(data$SRCombined,"SR_12-11.csv")
+```
+
+
+
+
